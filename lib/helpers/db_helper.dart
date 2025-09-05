@@ -15,7 +15,8 @@ class DBHelper {
 
     return notesJson.map((noteStr) {
       final noteMap = json.decode(noteStr) as Map<String, dynamic>;
-      return Note.fromMap(noteMap);
+       return Note.fromMap(noteMap, noteMap['id']?.toString() ?? '0');
+
     }).toList()
       ..sort((a, b) {
         // Sort: pinned first, then by creation date (newest first)
@@ -40,6 +41,10 @@ class DBHelper {
       content: note.content,
       createdAt: note.createdAt,
       isPinned: note.isPinned,
+      imagePaths: note.imagePaths,     // Add this
+      audioPaths: note.audioPaths,     // Add this
+      tags: note.tags,                 // Add this
+      updatedAt: DateTime.now(),       // Add this
     );
 
     notes.add(noteWithId);

@@ -7,6 +7,7 @@ class Note {
   final List<String> imagePaths;
   final List<String> audioPaths;
   final List<String> tags; // Add this field
+  final DateTime? updatedAt;
 
   Note({
     this.id,
@@ -17,43 +18,48 @@ class Note {
     this.imagePaths = const [],
     this.audioPaths = const [],
     this.tags = const [], // Add this parameter
+    this.updatedAt,
   });
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
+      'id': id, 
       'title': title,
       'content': content,
-      'createdAt': createdAt.toIso8601String(),
-      'isPinned': isPinned ? 1 : 0,
-      'imagePaths': imagePaths.join('|'),
-      'audioPaths': audioPaths.join('|'),
-      'tags': tags.join('|'), // Store as pipe-separated string
+      'createdAt': createdAt.millisecondsSinceEpoch,
+      'updatedAt': updatedAt?.millisecondsSinceEpoch,
+      'isPinned': isPinned,
+      'imagePaths': imagePaths,
+      'audioPaths': audioPaths,
+      'tags': tags,
     };
   }
 
-  factory Note.fromMap(Map<String, dynamic> map) {
+  factory Note.fromMap(Map<String, dynamic> map, [String? id]) {
     return Note(
-      id: map['id'],
-      title: map['title'],
-      content: map['content'],
-      createdAt: DateTime.parse(map['createdAt']),
-      isPinned: (map['isPinned'] ?? 0) == 1,
-      imagePaths: (map['imagePaths'] as String?)
-              ?.split('|')
-              .where((s) => s.isNotEmpty)
-              .toList() ??
-          [],
-      audioPaths: (map['audioPaths'] as String?)
-              ?.split('|')
-              .where((s) => s.isNotEmpty)
-              .toList() ??
-          [],
-      tags: (map['tags'] as String?)
-              ?.split('|')
-              .where((s) => s.isNotEmpty)
-              .toList() ??
-          [],
+      id: map['id'] ?? (id != null ? int.tryParse(id) : null),
+      title: map['title'] ?? '',
+      content: map['content'] ?? '',
+      createdAt: map['createdAt'] is int 
+          ? DateTime.fromMillisecondsSinceEpoch(map['createdAt'])
+          : DateTime.parse(map['createdAt']),
+      updatedAt: map['updatedAt'] != null 
+          ? (map['updatedAt'] is int 
+              ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'])
+              : DateTime.parse(map['updatedAt']))
+          : null,
+      isPinned: map['isPinned'] is bool 
+          ? map['isPinned'] 
+          : (map['isPinned'] ?? 0) == 1,
+      imagePaths: map['imagePaths'] is List
+          ? List<String>.from(map['imagePaths'])
+          : [],
+      audioPaths: map['audioPaths'] is List
+          ? List<String>.from(map['audioPaths'])
+          : [],
+      tags: map['tags'] is List
+          ? List<String>.from(map['tags'])
+          : [],
     );
   }
 }
