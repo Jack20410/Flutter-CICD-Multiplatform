@@ -35,35 +35,68 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.35.2'
         channel: 'stable'
-    
+
     - name: Install dependencies
       run: flutter pub get
-    
+
     - name: Build APK
       run: flutter build apk --release
-    
+
     - name: Build App Bundle
       run: flutter build appbundle --release
-    
+
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: release-apk
         path: build/app/outputs/flutter-apk/app-release.apk
         retention-days: 30
-    
+
     - name: Upload App Bundle
       uses: actions/upload-artifact@v4
       with:
         name: release-aab
         path: build/app/outputs/bundle/release/app-release.aab
+        retention-days: 30
+
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.2'
+        channel: 'stable'
+
+    - name: Install dependencies
+      run: flutter pub get
+
+    - name: Enable Windows desktop
+      run: flutter config --enable-windows-desktop
+
+    - name: Build Windows
+      run: flutter build windows --release
+
+    - name: Archive Windows build
+      run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows\note-app-windows.zip
+
+    - name: Upload Windows build
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-windows
+        path: build/windows/note-app-windows.zip
         retention-days: 30
