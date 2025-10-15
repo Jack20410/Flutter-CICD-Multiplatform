@@ -367,7 +367,8 @@ class ProfileScreen extends StatelessWidget {
       final deletions = await noteProvider.getAllDeletions();
       debugPrint("Remote note IDs: ${remoteNotes.map((n) => n.id).toList()}");
       debugPrint("Deletions found during sync: ${deletions.length}"); // Debug
-      debugPrint("Deleted note IDs: ${deletions.map((d) => d.noteId).toList()}");
+      debugPrint(
+          "Deleted note IDs: ${deletions.map((d) => d.noteId).toList()}");
       final deletedIds = deletions.map((d) => d.noteId).toSet();
       debugPrint("Remote notes before filtering: ${remoteNotes.length}");
 

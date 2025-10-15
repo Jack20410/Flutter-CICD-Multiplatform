@@ -43,7 +43,8 @@ class DBHelper {
     // Check if deletion was recorded
     final deletions = await getAllDeletions();
     debugPrint("Total deletions recorded: ${deletions.length}"); // Debug
-    debugPrint("Deleted IDs: ${deletions.map((d) => d.noteId).toList()}"); // Debug
+    debugPrint(
+        "Deleted IDs: ${deletions.map((d) => d.noteId).toList()}"); // Debug
 
     return initialLength - notes.length;
   }
