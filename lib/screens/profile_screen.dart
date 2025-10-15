@@ -6,6 +6,7 @@ import '../providers/note_provider.dart';
 import '../models/note.dart';
 import '../models/sync_result.dart';
 import '../services/cloud_sync_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -158,20 +159,6 @@ class ProfileScreen extends StatelessWidget {
                     color: CupertinoColors.destructiveRed,
                     onPressed: () => _signOut(context, authService),
                     child: const Text('Sign Out'),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Delete Account Button
-                CupertinoButton(
-                  onPressed: () => _deleteAccount(context, authService),
-                  child: const Text(
-                    'Delete Account',
-                    style: TextStyle(
-                      color: CupertinoColors.destructiveRed,
-                      fontSize: 14,
-                    ),
                   ),
                 ),
               ],
@@ -340,60 +327,87 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Future<void> _syncNotes(BuildContext context) async {
-    // Show loading dialog
-    showCupertinoDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const CupertinoAlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CupertinoActivityIndicator(),
-            SizedBox(height: 16),
-            Text('Syncing notes...'),
+    final noteProvider = Provider.of<NoteProvider>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    
+    if (!authService.isAuthenticated) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: const Text('Error'),
+          content: const Text('User not authenticated'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
           ],
         ),
-      ),
-    );
-
-    try {
-      // Get the note provider
-      final noteProvider = Provider.of<NoteProvider>(context, listen: false);
-      
-      // Get auth service for user identification
-      final authService = Provider.of<AuthService>(context, listen: false);
-      
-      if (!authService.isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      // Initialize cloud sync service if not already done
-      final cloudSyncService = CloudSyncService(
-    userId: authService.userId ?? '', // Use empty string as fallback
-    userEmail: authService.userEmail,
-  );
-
-      // Get local notes
-      final localNotes = noteProvider.notes;
-      
-      // Fetch remote notes
-      final remoteNotes = await cloudSyncService.fetchRemoteNotes();
-      
-      // Perform sync logic
-      final syncResult = await _performNoteSync(
-        localNotes: localNotes,
-        remoteNotes: remoteNotes,
-        cloudSyncService: cloudSyncService,
       );
+      return;
+    }
 
-      // Update local database with synced notes
-      await _updateLocalNotes(noteProvider, syncResult);
+    noteProvider.setSyncStatus(SyncStatus.checking);
+    
+    try {
+      final cloudSync = CloudSyncService(userId: authService.userId!);
+      final localNotes = noteProvider.notes;
+      final remoteNotes = await cloudSync.fetchRemoteNotes();
       
-      // Close loading dialog
-      if (context.mounted) {
-        Navigator.pop(context);
+      // Get deletion records to filter out deleted notes
+      final deletions = await noteProvider.getAllDeletions();
+      print("Remote note IDs: ${remoteNotes.map((n) => n.id).toList()}");
+      print("Deletions found during sync: ${deletions.length}"); // Debug
+      print("Deleted note IDs: ${deletions.map((d) => d.noteId).toList()}");  
+      final deletedIds = deletions.map((d) => d.noteId).toSet();
+      print("Remote notes before filtering: ${remoteNotes.length}");
+      
+      // Filter out deleted notes from remote notes
+      final validRemoteNotes = remoteNotes.where((note) => 
+        !deletedIds.contains(note.id)).toList();
+      print("Remote notes after filtering: ${validRemoteNotes.length}"); // Debug
+      // Analyze differences
+      final localIds = localNotes.map((n) => n.id).toSet();
+      final remoteIds = validRemoteNotes.map((n) => n.id).toSet();
+      
+      final onlyLocal = localIds.difference(remoteIds);
+      final onlyRemote = remoteIds.difference(localIds);
+      
+      // Show warning if there are differences
+      if (onlyLocal.isNotEmpty || onlyRemote.isNotEmpty) {
+        final shouldContinue = await _showSyncWarning(
+          context, 
+          onlyLocal.length, 
+          onlyRemote.length
+        );
+        
+        if (!shouldContinue) {
+          noteProvider.setSyncStatus(SyncStatus.unsaved);
+          return;
+        }
       }
-
+      
+      noteProvider.setSyncStatus(SyncStatus.syncing);
+      
+      // Perform sync operations
+      if (onlyLocal.isNotEmpty) {
+        // Upload local notes to cloud
+        for (final noteId in onlyLocal) {
+          final note = localNotes.firstWhere((n) => n.id == noteId);
+          await cloudSync.uploadNote(note);
+        }
+      }
+      
+      if (onlyRemote.isNotEmpty) {
+        // Download and add remote notes locally
+        for (final noteId in onlyRemote) {
+          final note = validRemoteNotes.firstWhere((n) => n.id == noteId);
+          await noteProvider.addNoteWithMedia(note);
+        }
+      }
+      
+      noteProvider.setSyncStatus(SyncStatus.upToDate);
+      
       // Show success dialog
       if (context.mounted) {
         showCupertinoDialog(
@@ -401,10 +415,8 @@ class ProfileScreen extends StatelessWidget {
           builder: (context) => CupertinoAlertDialog(
             title: const Text('Sync Complete'),
             content: Text(
-              'Successfully synced ${syncResult.updatedCount} notes.\n'
-              'Uploaded: ${syncResult.uploadedCount}\n'
-              'Downloaded: ${syncResult.downloadedCount}\n'
-              'Conflicts resolved: ${syncResult.conflictsResolved}',
+              'Uploaded: ${onlyLocal.length} notes\n'
+              'Downloaded: ${onlyRemote.length} notes'
             ),
             actions: [
               CupertinoDialogAction(
@@ -415,14 +427,10 @@ class ProfileScreen extends StatelessWidget {
           ),
         );
       }
-
-    } catch (e) {
-      // Close loading dialog
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
       
-      // Show error dialog
+    } catch (e) {
+      noteProvider.setSyncStatus(SyncStatus.unsaved);
+      
       if (context.mounted) {
         showCupertinoDialog(
           context: context,
@@ -441,83 +449,32 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  Future<SyncResult> _performNoteSync({
-    required List<Note> localNotes,
-    required List<Note> remoteNotes,
-    required CloudSyncService cloudSyncService,
-  }) async {
-    int uploadedCount = 0;
-    int downloadedCount = 0;
-    int updatedCount = 0;
-    int conflictsResolved = 0;
-
-    // Create maps for easier lookup
-    final localNotesMap = {for (var note in localNotes) note.id: note};
-    final remoteNotesMap = {for (var note in remoteNotes) note.id: note};
-
-    final List<Note> notesToUpload = [];
-    final List<Note> notesToDownload = [];
-    final List<Note> notesToUpdate = [];
-
-    // Find notes that need to be uploaded (local only)
-    for (var localNote in localNotes) {
-      if (!remoteNotesMap.containsKey(localNote.id)) {
-        notesToUpload.add(localNote);
-      } else {
-        // Compare timestamps for conflicts
-        final remoteNote = remoteNotesMap[localNote.id]!;
-        if (localNote.updatedAt != null && remoteNote.updatedAt != null) {
-          if (localNote.updatedAt!.isAfter(remoteNote.updatedAt!)) {
-            notesToUpload.add(localNote);
-            conflictsResolved++;
-          } else if (remoteNote.updatedAt!.isAfter(localNote.updatedAt!)) {
-            notesToDownload.add(remoteNote);
-            conflictsResolved++;
-          }
-        }
-      }
-    }
-
-    // Find notes that need to be downloaded (remote only)
-    for (var remoteNote in remoteNotes) {
-      if (!localNotesMap.containsKey(remoteNote.id)) {
-        notesToDownload.add(remoteNote);
-      }
-    }
-
-    // Upload local notes
-    for (var note in notesToUpload) {
-      await cloudSyncService.uploadNote(note);
-      uploadedCount++;
-    }
-
-    // Download remote notes
-    for (var note in notesToDownload) {
-      notesToUpdate.add(note);
-      downloadedCount++;
-    }
-
-    updatedCount = notesToUpload.length + notesToDownload.length;
-
-    return SyncResult(
-      uploadedCount: uploadedCount,
-      downloadedCount: downloadedCount,
-      updatedCount: updatedCount,
-      conflictsResolved: conflictsResolved,
-      notesToUpdate: notesToUpdate,
-    );
+  Future<bool> _showSyncWarning(BuildContext context, int localExtra, int remoteExtra) async {
+    return await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Sync Warning'),
+        content: Text(
+          'Sync will make the following changes:\n\n'
+          '${localExtra > 0 ? '• Upload $localExtra local notes to cloud\n' : ''}'
+          '${remoteExtra > 0 ? '• Download $remoteExtra notes from cloud\n' : ''}'
+          '\nDo you want to continue?'
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
-  Future<void> _updateLocalNotes(NoteProvider noteProvider, SyncResult syncResult) async {
-    // Add/update notes from sync result
-    for (var note in syncResult.notesToUpdate) {
-      if (noteProvider.notes.any((n) => n.id == note.id)) {
-        await noteProvider.updateNote(note);
-      } else {
-        await noteProvider.addNoteWithMedia(note);
-      }
-    }
-  }
+
 
   Future<void> _exportData(BuildContext context) async {
 
@@ -582,41 +539,148 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _deleteAccount(BuildContext context, AuthService authService) async {
-    final shouldDelete = await showCupertinoDialog<bool>(
+ Future<void> _deleteAccount(BuildContext context, AuthService authService) async {
+  final shouldDelete = await showCupertinoDialog<bool>(
+    context: context,
+    builder: (context) => CupertinoAlertDialog(
+      title: const Text('Delete Account'),
+      content: const Text(
+        'Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data.',
+      ),
+      actions: [
+        CupertinoDialogAction(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        CupertinoDialogAction(
+          isDestructiveAction: true,
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+
+  if (shouldDelete == true) {
+    final passwordController = TextEditingController();
+    
+    final password = await showCupertinoDialog<String>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text(
-          'Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data.',
+        title: const Text('Confirm Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please enter your password to confirm account deletion:'),
+            const SizedBox(height: 16),
+            CupertinoTextField(
+              controller: passwordController,
+              placeholder: 'Password',
+              obscureText: true,
+              decoration: BoxDecoration(
+                border: Border.all(color: CupertinoColors.systemGrey4),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ],
         ),
         actions: [
           CupertinoDialogAction(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context, null),
             child: const Text('Cancel'),
           ),
           CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, passwordController.text),
+            child: const Text('Confirm'),
           ),
         ],
       ),
     );
 
-    if (shouldDelete == true) {
+    if (password != null && password.isNotEmpty) {
+      // Show loading dialog
+      showCupertinoDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const CupertinoAlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoActivityIndicator(),
+              SizedBox(height: 16),
+              Text('Deleting account...'),
+            ],
+          ),
+        ),
+      );
+
       try {
-        await authService.deleteAccount();
+        print("Starting re-authentication..."); // Debug
+        
+        // Re-authenticate user with timeout
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          throw Exception('No user logged in');
+        }
+        
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        );
+        
+        // Add timeout to prevent hanging
+        await user.reauthenticateWithCredential(credential).timeout(
+          const Duration(minutes: 2),
+          onTimeout: () {
+            throw Exception('Authentication timeout - please check your internet connection');
+          },
+        );
+        
+        print("Re-authentication successful"); // Debug
+        
+        // Now delete the account with timeout
+        await user.delete().timeout(
+          const Duration(minutes: 2),
+          onTimeout: () {
+            throw Exception('Account deletion timeout - please try again');
+          },
+        );
+        
+        print("Account deletion successful"); // Debug
+        
+        // Close loading dialog
         if (context.mounted) {
           Navigator.pop(context);
         }
-      } catch (e) {
+        
+        // Navigate back to main screen
         if (context.mounted) {
+          Navigator.pop(context);
+        }
+        
+      } catch (e) {
+        print("Error during deletion: $e"); // Debug
+        
+        // Close loading dialog
+        if (context.mounted) {
+          Navigator.pop(context);
+        }
+        
+        if (context.mounted) {
+          String errorMessage = e.toString();
+          if (errorMessage.contains('wrong-password')) {
+            errorMessage = 'Incorrect password. Please try again.';
+          } else if (errorMessage.contains('timeout')) {
+            errorMessage = 'Operation timed out. Please check your internet connection and try again.';
+          } else if (errorMessage.contains('network')) {
+            errorMessage = 'Network error. Please check your internet connection.';
+          }
+          
           showCupertinoDialog(
             context: context,
             builder: (context) => CupertinoAlertDialog(
               title: const Text('Error'),
-              content: Text('Failed to delete account: ${e.toString()}'),
+              content: Text(errorMessage),
               actions: [
                 CupertinoDialogAction(
                   onPressed: () => Navigator.pop(context),
@@ -629,4 +693,5 @@ class ProfileScreen extends StatelessWidget {
       }
     }
   }
+}
 }

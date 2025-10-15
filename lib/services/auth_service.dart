@@ -1,7 +1,7 @@
 // lib/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? _user;
@@ -45,15 +45,36 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // Delete account
-  Future<void> deleteAccount() async {
-    try {
-      await _user?.delete();
-    } catch (e) {
 
-      rethrow;
+  // In your AuthService class
+  Future<void> deleteAccount() async {
+  try {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('No user currently signed in');
     }
+
+    // Clean up Firestore data first
+    final firestore = FirebaseFirestore.instance;
+    final userDoc = firestore.collection('users').doc(user.uid);
+    
+    // Delete all user notes
+    final notesQuery = await userDoc.collection('notes').get();
+    for (var doc in notesQuery.docs) {
+      await doc.reference.delete();
+    }
+    
+    // Delete user document
+    await userDoc.delete();
+    
+    // Now try to delete the auth account
+    await user.delete();
+    
+  } catch (e) {
+    print('Delete account error: $e');
+    rethrow;
   }
+}
 
   // Update user profile
   Future<void> updateProfile({String? displayName}) async {

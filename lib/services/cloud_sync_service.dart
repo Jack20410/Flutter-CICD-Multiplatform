@@ -19,7 +19,11 @@ class CloudSyncService {
       
       return querySnapshot.docs.map((doc) {
         final data = doc.data();
-        return Note.fromMap(data, doc.id);
+        // Make sure to parse the document ID back to int
+        final noteId = int.tryParse(doc.id) ?? 0;
+        
+        // Create note with correct ID
+        return Note.fromMap(data, noteId.toString());
       }).toList();
     } catch (e) {
       throw Exception('Failed to fetch remote notes: $e');

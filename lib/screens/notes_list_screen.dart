@@ -9,9 +9,46 @@ import '../services/auth_service.dart';
 import 'note_edit_screen.dart';
 import 'login_screen.dart';
 import 'profile_screen.dart';
-
+import 'dart:convert';
 class NotesListScreen extends StatelessWidget {
   const NotesListScreen({super.key});
+
+  bool _hasUncompletedTodos(Note note) {
+    final todoMetaPattern = RegExp(r'\[TODO_META:([^\]]+)\]');
+    final todoMatches = todoMetaPattern.allMatches(note.content);
+    
+    for (final match in todoMatches) {
+      final base64Data = match.group(1) ?? '';
+      
+      try {
+        // Decode the Base64 string
+        final decodedBytes = base64.decode(base64Data);
+        final jsonString = utf8.decode(decodedBytes);
+        
+        // Parse the JSON
+        final Map<String, dynamic> todoData = json.decode(jsonString);
+        
+        // Check if there are any uncompleted todos
+        if (todoData.containsKey('todos')) {
+          final List<dynamic> todos = todoData['todos'];
+          
+          for (final todo in todos) {
+            if (todo is Map<String, dynamic> && 
+                todo.containsKey('isCompleted') && 
+                todo['isCompleted'] == false) {
+              return true; // Found at least one uncompleted todo
+            }
+          }
+        }
+      } catch (e) {
+        // If decoding fails, skip this metadata
+        print('Error decoding todo metadata: $e');
+        continue;
+      }
+    }
+    
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -426,202 +463,239 @@ class NotesListScreen extends StatelessWidget {
   }
 
   Widget _buildNoteCard(
-      BuildContext context, NoteProvider noteProvider, Note note) {
-    final cleanContent = _getCleanContent(note.content);
-    final mediaPreview = _getMediaPreview(note);
+    BuildContext context, NoteProvider noteProvider, Note note) {
+  final cleanContent = _getCleanContent(note.content);
+  final mediaPreview = _getMediaPreview(note);
+  final hasUncompletedTodos = _hasUncompletedTodos(note);
 
-    return Consumer<AuthService>(
-      builder: (context, authService, child) {
-        return Dismissible(
-          key: Key(note.id.toString()),
-          background: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: authService.isAuthenticated 
-                  ? CupertinoColors.systemGreen 
-                  : CupertinoColors.activeBlue,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  authService.isAuthenticated
-                      ? (note.isPinned ? CupertinoIcons.pin_slash : CupertinoIcons.pin)
-                      : CupertinoIcons.person_circle,
-                  color: CupertinoColors.white,
-                  size: 24,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  authService.isAuthenticated
-                      ? (note.isPinned ? 'Unpin' : 'Pin')
-                      : 'Login',
-                  style: const TextStyle(
-                    color: CupertinoColors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+  return Consumer<AuthService>(
+    builder: (context, authService, child) {
+      return Dismissible(
+        key: Key(note.id.toString()),
+        background: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: authService.isAuthenticated 
+                ? CupertinoColors.systemGreen 
+                : CupertinoColors.activeBlue,
+            borderRadius: BorderRadius.circular(12),
           ),
-          secondaryBackground: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6),
-            decoration: BoxDecoration(
-              color: CupertinoColors.destructiveRed,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  CupertinoIcons.delete,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                authService.isAuthenticated
+                    ? (note.isPinned ? CupertinoIcons.pin_slash : CupertinoIcons.pin)
+                    : CupertinoIcons.person_circle,
+                color: CupertinoColors.white,
+                size: 24,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                authService.isAuthenticated
+                    ? (note.isPinned ? 'Unpin' : 'Pin')
+                    : 'Login',
+                style: const TextStyle(
                   color: CupertinoColors.white,
-                  size: 24,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'Delete',
-                  style: TextStyle(
-                    color: CupertinoColors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          confirmDismiss: (direction) async {
-            if (direction == DismissDirection.endToStart) {
-              return await showCupertinoDialog<bool>(
-                    context: context,
-                    builder: (BuildContext ctx) {
-                      return CupertinoAlertDialog(
-                        title: const Text('Delete Note'),
-                        content: const Text(
-                            'Are you sure you want to delete this note? This action cannot be undone.'),
-                        actions: [
-                          CupertinoDialogAction(
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                            child: const Text('Cancel'),
-                          ),
-                          CupertinoDialogAction(
-                            isDestructiveAction: true,
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      );
-                    },
-                  ) ??
-                  false;
-            } else if (direction == DismissDirection.startToEnd) {
-              if (authService.isAuthenticated) {
-                noteProvider.togglePinNote(note);
-              } else {
-                // Navigate to login screen
-                Navigator.of(context).push(CupertinoPageRoute(
-                  builder: (context) => const LoginScreen(),
-                ));
-              }
-              return false;
+        ),
+        secondaryBackground: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: CupertinoColors.destructiveRed,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.delete,
+                color: CupertinoColors.white,
+                size: 24,
+              ),
+              SizedBox(height: 4),
+              Text(
+                'Delete',
+                style: TextStyle(
+                  color: CupertinoColors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.endToStart) {
+            return await showCupertinoDialog<bool>(
+                  context: context,
+                  builder: (BuildContext ctx) {
+                    return CupertinoAlertDialog(
+                      title: const Text('Delete Note'),
+                      content: const Text(
+                          'Are you sure you want to delete this note? This action cannot be undone.'),
+                      actions: [
+                        CupertinoDialogAction(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        CupertinoDialogAction(
+                          isDestructiveAction: true,
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    );
+                  },
+                ) ??
+                false;
+          } else if (direction == DismissDirection.startToEnd) {
+            if (authService.isAuthenticated) {
+              noteProvider.togglePinNote(note);
+            } else {
+              // Navigate to login screen
+              Navigator.of(context).push(CupertinoPageRoute(
+                builder: (context) => const LoginScreen(),
+              ));
             }
             return false;
-          },
-          onDismissed: (direction) {
-            if (direction == DismissDirection.endToStart) {
-              noteProvider.deleteNote(note.id!);
-            }
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBackground.resolveFrom(context),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: CupertinoColors.systemGrey.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+          }
+          return false;
+        },
+        onDismissed: (direction) {
+          if (direction == DismissDirection.endToStart) {
+            noteProvider.deleteNote(note.id!);
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBackground.resolveFrom(context),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: CupertinoColors.systemGrey.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: CupertinoButton(
+            padding: const EdgeInsets.all(20),
+            onPressed: () {
+              Navigator.of(context).push(CupertinoPageRoute(
+                builder: (context) => NoteEditScreen(note: note),
+              ));
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and Tags Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  note.title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                    color: CupertinoColors.label.resolveFrom(context),
+                                  ),
+                                ),
+                              ),
+                              // Todo indicator - only show if there are uncompleted todos
+                              if (hasUncompletedTodos)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: CupertinoColors.destructiveRed.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        CupertinoIcons.exclamationmark_circle_fill,
+                                        size: 12,
+                                        color: CupertinoColors.destructiveRed,
+                                      ),
+                                      SizedBox(width: 2),
+                                      Text(
+                                        'TODO',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: CupertinoColors.destructiveRed,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (note.tags.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            _buildTags(note.tags),
+                          ],
+                        ],
+                      ),
+                    ),
+                    // Media preview on the right
+                    if (mediaPreview != null) ...[
+                      const SizedBox(width: 12),
+                      mediaPreview,
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: 8),
+
+                // Content preview - keep original color
+                if (cleanContent.isNotEmpty)
+                  Text(
+                    cleanContent,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: CupertinoColors.label.resolveFrom(context),
+                    ),
+                  ),
+
+                const SizedBox(height: 8),
+
+                // Date - keep original color
+                Text(
+                  DateFormat.yMMMd().format(note.createdAt),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
-            child: CupertinoButton(
-              padding: const EdgeInsets.all(20),
-              onPressed: () {
-                Navigator.of(context).push(CupertinoPageRoute(
-                  builder: (context) => NoteEditScreen(note: note),
-                ));
-              },
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title and Tags Row
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              note.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: CupertinoColors.label.resolveFrom(context),
-                              ),
-                            ),
-                            if (note.tags.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              _buildTags(note.tags),
-                            ],
-                          ],
-                        ),
-                      ),
-                      // Media preview on the right
-                      if (mediaPreview != null) ...[
-                        const SizedBox(width: 12),
-                        mediaPreview,
-                      ],
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Content preview
-                  if (cleanContent.isNotEmpty)
-                    Text(
-                      cleanContent,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: CupertinoColors.label.resolveFrom(context),
-                      ),
-                    ),
-
-                  const SizedBox(height: 8),
-
-                  // Date
-                  Text(
-                    DateFormat.yMMMd().format(note.createdAt),
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: CupertinoColors.secondaryLabel.resolveFrom(context),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

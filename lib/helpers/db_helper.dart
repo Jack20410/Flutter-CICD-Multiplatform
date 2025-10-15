@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/note.dart';
+import '../models/deletion_record.dart'; 
 
 class DBHelper {
   static const String _notesKey = 'notes_list';
+  static const String _deletionsKey = 'deletions_list'; 
   static const String _counterKey = 'note_counter';
 
   static final DBHelper instance = DBHelper._privateConstructor();
@@ -24,6 +26,52 @@ class DBHelper {
         if (!a.isPinned && b.isPinned) return 1;
         return b.createdAt.compareTo(a.createdAt);
       });
+  }
+  Future<int> delete(int id) async {
+    print("Deleting note with ID: $id"); // Debug
+    
+    final notes = await getAllNotes();
+    final initialLength = notes.length;
+    notes.removeWhere((note) => note.id == id);
+
+    await _saveNotes(notes);
+    
+    // Record the deletion
+    await recordDeletion(id, DateTime.now());
+    
+    // Check if deletion was recorded
+    final deletions = await getAllDeletions();
+    print("Total deletions recorded: ${deletions.length}"); // Debug
+    print("Deleted IDs: ${deletions.map((d) => d.noteId).toList()}"); // Debug
+    
+    return initialLength - notes.length;
+  }
+  Future<void> recordDeletion(int noteId, DateTime deletedAt) async {
+    final prefs = await SharedPreferences.getInstance();
+    final deletions = await getAllDeletions();
+    
+    deletions.add(DeletionRecord(noteId: noteId, deletedAt: deletedAt));
+    
+    final deletionsJson = deletions.map((d) => json.encode(d.toMap())).toList();
+    await prefs.setStringList(_deletionsKey, deletionsJson);
+  }
+  // In DBHelper class
+  Future<List<DeletionRecord>> getAllDeletions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final deletionsJson = prefs.getStringList(_deletionsKey) ?? [];
+    
+    print("Raw deletion records: $deletionsJson"); // Debug
+    
+    return deletionsJson.map((deletionStr) {
+      final deletionMap = json.decode(deletionStr) as Map<String, dynamic>;
+      return DeletionRecord.fromMap(deletionMap);
+    }).toList();
+  }
+
+  // Add this method to clear old deletions after successful sync
+  Future<void> clearDeletions() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_deletionsKey);
   }
 
   Future<int> insert(Note note) async {
@@ -64,14 +112,6 @@ class DBHelper {
     return 0;
   }
 
-  Future<int> delete(int id) async {
-    final notes = await getAllNotes();
-    final initialLength = notes.length;
-    notes.removeWhere((note) => note.id == id);
-
-    await _saveNotes(notes);
-    return initialLength - notes.length;
-  }
 
   Future<void> _saveNotes(List<Note> notes) async {
     final prefs = await SharedPreferences.getInstance();
