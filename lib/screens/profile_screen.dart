@@ -386,9 +386,11 @@ class ProfileScreen extends StatelessWidget {
 
       // Show warning if there are differences
       if (onlyLocal.isNotEmpty || onlyRemote.isNotEmpty) {
-        // ignore: use_build_context_synchronously
         final shouldContinue = await _showSyncWarning(
-            context, onlyLocal.length, onlyRemote.length);
+            // ignore: use_build_context_synchronously
+            context,
+            onlyLocal.length,
+            onlyRemote.length);
 
         if (!shouldContinue) {
           noteProvider.setSyncStatus(SyncStatus.unsaved);
@@ -570,8 +572,8 @@ class ProfileScreen extends StatelessWidget {
     if (shouldDelete == true) {
       final passwordController = TextEditingController();
 
-      // ignore: use_build_context_synchronously
       final password = await showCupertinoDialog<String>(
+        // ignore: use_build_context_synchronously
         context: context,
         builder: (context) => CupertinoAlertDialog(
           title: const Text('Confirm Password'),
@@ -607,8 +609,8 @@ class ProfileScreen extends StatelessWidget {
 
       if (password != null && password.isNotEmpty) {
         // Show loading dialog
-        // ignore: use_build_context_synchronously
         showCupertinoDialog(
+          // ignore: use_build_context_synchronously
           context: context,
           barrierDismissible: false,
           builder: (context) => const CupertinoAlertDialog(
