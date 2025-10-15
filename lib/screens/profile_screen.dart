@@ -3,8 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../providers/note_provider.dart';
-import '../models/note.dart';
-import '../models/sync_result.dart';
 import '../services/cloud_sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -367,16 +365,16 @@ class ProfileScreen extends StatelessWidget {
 
       // Get deletion records to filter out deleted notes
       final deletions = await noteProvider.getAllDeletions();
-      print("Remote note IDs: ${remoteNotes.map((n) => n.id).toList()}");
-      print("Deletions found during sync: ${deletions.length}"); // Debug
-      print("Deleted note IDs: ${deletions.map((d) => d.noteId).toList()}");
+      debugPrint("Remote note IDs: ${remoteNotes.map((n) => n.id).toList()}");
+      debugPrint("Deletions found during sync: ${deletions.length}"); // Debug
+      debugPrint("Deleted note IDs: ${deletions.map((d) => d.noteId).toList()}");
       final deletedIds = deletions.map((d) => d.noteId).toSet();
-      print("Remote notes before filtering: ${remoteNotes.length}");
+      debugPrint("Remote notes before filtering: ${remoteNotes.length}");
 
       // Filter out deleted notes from remote notes
       final validRemoteNotes =
           remoteNotes.where((note) => !deletedIds.contains(note.id)).toList();
-      print(
+      debugPrint(
           "Remote notes after filtering: ${validRemoteNotes.length}"); // Debug
       // Analyze differences
       final localIds = localNotes.map((n) => n.id).toSet();
@@ -387,6 +385,7 @@ class ProfileScreen extends StatelessWidget {
 
       // Show warning if there are differences
       if (onlyLocal.isNotEmpty || onlyRemote.isNotEmpty) {
+        // ignore: use_build_context_synchronously
         final shouldContinue = await _showSyncWarning(
             context, onlyLocal.length, onlyRemote.length);
 
@@ -542,6 +541,8 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  // Commented out unused method - can be enabled later if needed
+  // ignore: unused_element
   Future<void> _deleteAccount(
       BuildContext context, AuthService authService) async {
     final shouldDelete = await showCupertinoDialog<bool>(
@@ -568,6 +569,7 @@ class ProfileScreen extends StatelessWidget {
     if (shouldDelete == true) {
       final passwordController = TextEditingController();
 
+      // ignore: use_build_context_synchronously
       final password = await showCupertinoDialog<String>(
         context: context,
         builder: (context) => CupertinoAlertDialog(
@@ -604,6 +606,7 @@ class ProfileScreen extends StatelessWidget {
 
       if (password != null && password.isNotEmpty) {
         // Show loading dialog
+        // ignore: use_build_context_synchronously
         showCupertinoDialog(
           context: context,
           barrierDismissible: false,
@@ -620,7 +623,7 @@ class ProfileScreen extends StatelessWidget {
         );
 
         try {
-          print("Starting re-authentication..."); // Debug
+          debugPrint("Starting re-authentication..."); // Debug
 
           // Re-authenticate user with timeout
           final user = FirebaseAuth.instance.currentUser;
@@ -642,7 +645,7 @@ class ProfileScreen extends StatelessWidget {
             },
           );
 
-          print("Re-authentication successful"); // Debug
+          debugPrint("Re-authentication successful"); // Debug
 
           // Now delete the account with timeout
           await user.delete().timeout(
@@ -652,7 +655,7 @@ class ProfileScreen extends StatelessWidget {
             },
           );
 
-          print("Account deletion successful"); // Debug
+          debugPrint("Account deletion successful"); // Debug
 
           // Close loading dialog
           if (context.mounted) {
@@ -664,7 +667,7 @@ class ProfileScreen extends StatelessWidget {
             Navigator.pop(context);
           }
         } catch (e) {
-          print("Error during deletion: $e"); // Debug
+          debugPrint("Error during deletion: $e"); // Debug
 
           // Close loading dialog
           if (context.mounted) {

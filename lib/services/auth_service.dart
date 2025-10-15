@@ -69,7 +69,7 @@ class AuthService extends ChangeNotifier {
       // Now try to delete the auth account
       await user.delete();
     } catch (e) {
-      print('Delete account error: $e');
+      debugPrint('Delete account error: $e');
       rethrow;
     }
   }

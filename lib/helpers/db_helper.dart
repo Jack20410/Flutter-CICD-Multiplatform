@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/note.dart';
 import '../models/deletion_record.dart';
@@ -28,7 +29,7 @@ class DBHelper {
   }
 
   Future<int> delete(int id) async {
-    print("Deleting note with ID: $id"); // Debug
+    debugPrint("Deleting note with ID: $id"); // Debug
 
     final notes = await getAllNotes();
     final initialLength = notes.length;
@@ -41,8 +42,8 @@ class DBHelper {
 
     // Check if deletion was recorded
     final deletions = await getAllDeletions();
-    print("Total deletions recorded: ${deletions.length}"); // Debug
-    print("Deleted IDs: ${deletions.map((d) => d.noteId).toList()}"); // Debug
+    debugPrint("Total deletions recorded: ${deletions.length}"); // Debug
+    debugPrint("Deleted IDs: ${deletions.map((d) => d.noteId).toList()}"); // Debug
 
     return initialLength - notes.length;
   }
@@ -62,7 +63,7 @@ class DBHelper {
     final prefs = await SharedPreferences.getInstance();
     final deletionsJson = prefs.getStringList(_deletionsKey) ?? [];
 
-    print("Raw deletion records: $deletionsJson"); // Debug
+    debugPrint("Raw deletion records: $deletionsJson"); // Debug
 
     return deletionsJson.map((deletionStr) {
       final deletionMap = json.decode(deletionStr) as Map<String, dynamic>;

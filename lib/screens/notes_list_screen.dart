@@ -43,7 +43,7 @@ class NotesListScreen extends StatelessWidget {
         }
       } catch (e) {
         // If decoding fails, skip this metadata
-        print('Error decoding todo metadata: $e');
+        debugPrint('Error decoding todo metadata: $e');
         continue;
       }
     }
