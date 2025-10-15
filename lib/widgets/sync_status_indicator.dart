@@ -11,11 +11,11 @@ class SyncStatusIndicator extends StatelessWidget {
     return Consumer<NoteProvider>(
       builder: (context, noteProvider, child) {
         final status = noteProvider.syncStatus;
-        
+
         Color color;
         String text;
         IconData icon;
-        
+
         switch (status) {
           case SyncStatus.upToDate:
             color = CupertinoColors.systemGreen;
@@ -38,7 +38,7 @@ class SyncStatusIndicator extends StatelessWidget {
             icon = CupertinoIcons.cloud_upload;
             break;
         }
-        
+
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(

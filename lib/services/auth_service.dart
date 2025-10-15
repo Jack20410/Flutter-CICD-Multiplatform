@@ -2,6 +2,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? _user;
@@ -26,7 +27,7 @@ class AuthService extends ChangeNotifier {
   String get userInitials {
     if (_user?.displayName != null && _user!.displayName!.isNotEmpty) {
       final names = _user!.displayName!.split(' ');
-      return names.length > 1 
+      return names.length > 1
           ? '${names[0][0]}${names[1][0]}'.toUpperCase()
           : names[0][0].toUpperCase();
     } else if (_user?.email != null) {
@@ -40,41 +41,38 @@ class AuthService extends ChangeNotifier {
     try {
       await _auth.signOut();
     } catch (e) {
-
       rethrow;
     }
   }
 
-
   // In your AuthService class
   Future<void> deleteAccount() async {
-  try {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('No user currently signed in');
-    }
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw Exception('No user currently signed in');
+      }
 
-    // Clean up Firestore data first
-    final firestore = FirebaseFirestore.instance;
-    final userDoc = firestore.collection('users').doc(user.uid);
-    
-    // Delete all user notes
-    final notesQuery = await userDoc.collection('notes').get();
-    for (var doc in notesQuery.docs) {
-      await doc.reference.delete();
+      // Clean up Firestore data first
+      final firestore = FirebaseFirestore.instance;
+      final userDoc = firestore.collection('users').doc(user.uid);
+
+      // Delete all user notes
+      final notesQuery = await userDoc.collection('notes').get();
+      for (var doc in notesQuery.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete user document
+      await userDoc.delete();
+
+      // Now try to delete the auth account
+      await user.delete();
+    } catch (e) {
+      print('Delete account error: $e');
+      rethrow;
     }
-    
-    // Delete user document
-    await userDoc.delete();
-    
-    // Now try to delete the auth account
-    await user.delete();
-    
-  } catch (e) {
-    print('Delete account error: $e');
-    rethrow;
   }
-}
 
   // Update user profile
   Future<void> updateProfile({String? displayName}) async {
@@ -82,7 +80,6 @@ class AuthService extends ChangeNotifier {
       await _user?.updateDisplayName(displayName);
       notifyListeners();
     } catch (e) {
-
       rethrow;
     }
   }
@@ -92,7 +89,6 @@ class AuthService extends ChangeNotifier {
     try {
       await _user?.sendEmailVerification();
     } catch (e) {
-
       rethrow;
     }
   }
@@ -106,9 +102,7 @@ class AuthService extends ChangeNotifier {
       await _user?.reload();
       _user = _auth.currentUser;
       notifyListeners();
-    // ignore: empty_catches
-    } catch (e) {
-
-    }
+      // ignore: empty_catches
+    } catch (e) {}
   }
 }

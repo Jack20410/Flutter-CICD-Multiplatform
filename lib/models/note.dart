@@ -23,7 +23,7 @@ class Note {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': id, 
+      'id': id,
       'title': title,
       'content': content,
       'createdAt': createdAt.millisecondsSinceEpoch,
@@ -40,26 +40,22 @@ class Note {
       id: map['id'] ?? (id != null ? int.tryParse(id) : null),
       title: map['title'] ?? '',
       content: map['content'] ?? '',
-      createdAt: map['createdAt'] is int 
+      createdAt: map['createdAt'] is int
           ? DateTime.fromMillisecondsSinceEpoch(map['createdAt'])
           : DateTime.parse(map['createdAt']),
-      updatedAt: map['updatedAt'] != null 
-          ? (map['updatedAt'] is int 
+      updatedAt: map['updatedAt'] != null
+          ? (map['updatedAt'] is int
               ? DateTime.fromMillisecondsSinceEpoch(map['updatedAt'])
               : DateTime.parse(map['updatedAt']))
           : null,
-      isPinned: map['isPinned'] is bool 
-          ? map['isPinned'] 
+      isPinned: map['isPinned'] is bool
+          ? map['isPinned']
           : (map['isPinned'] ?? 0) == 1,
-      imagePaths: map['imagePaths'] is List
-          ? List<String>.from(map['imagePaths'])
-          : [],
-      audioPaths: map['audioPaths'] is List
-          ? List<String>.from(map['audioPaths'])
-          : [],
-      tags: map['tags'] is List
-          ? List<String>.from(map['tags'])
-          : [],
+      imagePaths:
+          map['imagePaths'] is List ? List<String>.from(map['imagePaths']) : [],
+      audioPaths:
+          map['audioPaths'] is List ? List<String>.from(map['audioPaths']) : [],
+      tags: map['tags'] is List ? List<String>.from(map['tags']) : [],
     );
   }
 }

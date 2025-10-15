@@ -6,9 +6,9 @@ class CloudSyncService {
   final String userId;
   final String? userEmail;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   CloudSyncService({required this.userId, this.userEmail});
-  
+
   Future<List<Note>> fetchRemoteNotes() async {
     try {
       final querySnapshot = await _firestore
@@ -16,12 +16,12 @@ class CloudSyncService {
           .doc(userId)
           .collection('notes')
           .get();
-      
+
       return querySnapshot.docs.map((doc) {
         final data = doc.data();
         // Make sure to parse the document ID back to int
         final noteId = int.tryParse(doc.id) ?? 0;
-        
+
         // Create note with correct ID
         return Note.fromMap(data, noteId.toString());
       }).toList();
@@ -29,7 +29,7 @@ class CloudSyncService {
       throw Exception('Failed to fetch remote notes: $e');
     }
   }
-  
+
   Future<void> uploadNote(Note note) async {
     try {
       await _firestore

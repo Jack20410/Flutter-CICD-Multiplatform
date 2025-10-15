@@ -15,7 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _isSignUp = false;
   bool _obscurePassword = true;
@@ -42,7 +42,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      
+
       if (mounted) {
         Navigator.of(context).pop(); // Go back to notes screen
       }
@@ -72,15 +72,16 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       // Update display name if provided
       if (_nameController.text.trim().isNotEmpty) {
-        await userCredential.user?.updateDisplayName(_nameController.text.trim());
+        await userCredential.user
+            ?.updateDisplayName(_nameController.text.trim());
       }
 
       if (mounted) {
@@ -134,7 +135,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-
   String? _validateName(String? value) {
     if (_isSignUp && (value == null || value.trim().isEmpty)) {
       return 'Please enter your name';
@@ -176,8 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 Text(
-                  _isSignUp 
-                      ? 'Sign up to sync your notes' 
+                  _isSignUp
+                      ? 'Sign up to sync your notes'
                       : 'Sign in to access your notes',
                   style: TextStyle(
                     fontSize: 16,
@@ -221,7 +221,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscurePassword,
                     prefix: const Padding(
                       padding: EdgeInsets.only(left: 12),
-                      child: Icon(CupertinoIcons.lock, color: CupertinoColors.systemGrey),
+                      child: Icon(CupertinoIcons.lock,
+                          color: CupertinoColors.systemGrey),
                     ),
                     suffix: CupertinoButton(
                       padding: EdgeInsets.zero,
@@ -231,13 +232,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         });
                       },
                       child: Icon(
-                        _obscurePassword 
-                            ? CupertinoIcons.eye 
+                        _obscurePassword
+                            ? CupertinoIcons.eye
                             : CupertinoIcons.eye_slash,
                         color: CupertinoColors.systemGrey,
                       ),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _isSignUp ? _signUp() : _signIn(),
                     decoration: const BoxDecoration(),
@@ -273,7 +275,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: CupertinoButton.filled(
-                    onPressed: _isLoading ? null : (_isSignUp ? _signUp : _signIn),
+                    onPressed:
+                        _isLoading ? null : (_isSignUp ? _signUp : _signIn),
                     child: _isLoading
                         ? const CupertinoActivityIndicator(color: Colors.white)
                         : Text(_isSignUp ? 'Sign Up' : 'Sign In'),
@@ -287,21 +290,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      _isSignUp 
-                          ? 'Already have an account? ' 
+                      _isSignUp
+                          ? 'Already have an account? '
                           : 'Don\'t have an account? ',
                       style: TextStyle(
-                        color: CupertinoColors.secondaryLabel.resolveFrom(context),
+                        color:
+                            CupertinoColors.secondaryLabel.resolveFrom(context),
                       ),
                     ),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      onPressed: _isLoading ? null : () {
-                        setState(() {
-                          _isSignUp = !_isSignUp;
-                          _errorMessage = '';
-                        });
-                      },
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              setState(() {
+                                _isSignUp = !_isSignUp;
+                                _errorMessage = '';
+                              });
+                            },
                       child: Text(
                         _isSignUp ? 'Sign In' : 'Sign Up',
                         style: const TextStyle(
@@ -347,13 +353,14 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
       );
-      
+
       if (mounted) {
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
             title: const Text('Password Reset'),
-            content: const Text('A password reset link has been sent to your email.'),
+            content: const Text(
+                'A password reset link has been sent to your email.'),
             actions: [
               CupertinoDialogAction(
                 onPressed: () => Navigator.pop(context),

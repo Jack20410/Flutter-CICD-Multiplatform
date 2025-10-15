@@ -7,7 +7,9 @@ import '../services/semantic_search_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/auth_service.dart';
 import '../models/deletion_record.dart';
+
 enum SyncStatus { upToDate, unsaved, checking, syncing }
+
 class NoteProvider with ChangeNotifier {
   List<Note> _notes = [];
   List<Note> _filteredNotes = []; // Add this for search results
@@ -39,6 +41,7 @@ class NoteProvider with ChangeNotifier {
     _syncStatus = status;
     notifyListeners();
   }
+
   Future<void> _buildSearchIndex() async {
     if (_allNotes.isEmpty) return;
 
@@ -49,33 +52,35 @@ class NoteProvider with ChangeNotifier {
       _indexBuilt = false;
     }
   }
+
   Future<void> checkSyncStatus(AuthService authService) async {
-  setSyncStatus(SyncStatus.checking);
-  
-  try {
-    if (!authService.isAuthenticated) {
+    setSyncStatus(SyncStatus.checking);
+
+    try {
+      if (!authService.isAuthenticated) {
+        setSyncStatus(SyncStatus.unsaved);
+        return;
+      }
+
+      final cloudSync = CloudSyncService(userId: authService.userId!);
+      final remoteNotes = await cloudSync.fetchRemoteNotes();
+
+      // Compare local and remote notes
+      final localNotesIds = _notes.map((n) => n.id).toSet();
+      final remoteNotesIds = remoteNotes.map((n) => n.id).toSet();
+
+      if (localNotesIds.length == remoteNotesIds.length &&
+          localNotesIds.difference(remoteNotesIds).isEmpty) {
+        setSyncStatus(SyncStatus.upToDate);
+        _lastSyncTime = DateTime.now();
+      } else {
+        setSyncStatus(SyncStatus.unsaved);
+      }
+    } catch (e) {
       setSyncStatus(SyncStatus.unsaved);
-      return;
     }
-    
-    final cloudSync = CloudSyncService(userId: authService.userId!);
-    final remoteNotes = await cloudSync.fetchRemoteNotes();
-    
-    // Compare local and remote notes
-    final localNotesIds = _notes.map((n) => n.id).toSet();
-    final remoteNotesIds = remoteNotes.map((n) => n.id).toSet();
-    
-    if (localNotesIds.length == remoteNotesIds.length && 
-        localNotesIds.difference(remoteNotesIds).isEmpty) {
-      setSyncStatus(SyncStatus.upToDate);
-      _lastSyncTime = DateTime.now();
-    } else {
-      setSyncStatus(SyncStatus.unsaved);
-    }
-  } catch (e) {
-    setSyncStatus(SyncStatus.unsaved);
   }
-}
+
   // Regular constructor
   NoteProvider() : _dbHelper = DBHelper.instance {
     fetchNotes();
@@ -153,6 +158,7 @@ class NoteProvider with ChangeNotifier {
     _filteredNotes = [];
     notifyListeners();
   }
+
   // In NoteProvider class
   Future<List<DeletionRecord>> getAllDeletions() async {
     if (_dbHelper != null) {
@@ -160,6 +166,7 @@ class NoteProvider with ChangeNotifier {
     }
     return [];
   }
+
   Future<void> addNote(String title, String content) async {
     Note newNote = Note(
       title: title,
@@ -224,7 +231,7 @@ class NoteProvider with ChangeNotifier {
     // Fix: Rebuild search index after adding note with media
     _indexBuilt = false;
   }
-  
+
   Future<void> togglePinNote(Note note) async {
     Note updatedNote = Note(
       id: note.id,
@@ -288,7 +295,7 @@ class NoteProvider with ChangeNotifier {
     _expandedSections[monthKey] = !(_expandedSections[monthKey] ?? true);
     notifyListeners();
   }
-  
+
   bool isSectionExpanded(String monthKey) {
     return _expandedSections[monthKey] ?? true;
   }

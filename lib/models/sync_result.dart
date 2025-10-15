@@ -6,7 +6,7 @@ class SyncResult {
   final int updatedCount;
   final int conflictsResolved;
   final List<Note> notesToUpdate;
-  
+
   SyncResult({
     required this.uploadedCount,
     required this.downloadedCount,
