@@ -271,8 +271,7 @@ class NoteProvider with ChangeNotifier {
     }
 
     for (Note note in unpinnedNotes) {
-      String monthKey =
-          DateFormat('MMM yyyy').format(note.createdAt).toUpperCase();
+      String monthKey = DateFormat('MMM yyyy').format(note.createdAt);
       if (!grouped.containsKey(monthKey)) {
         grouped[monthKey] = [];
         if (!_expandedSections.containsKey(monthKey)) {

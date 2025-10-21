@@ -3,6 +3,8 @@ name: CI/CD
 on:
   push:
     branches: [ main, develop ]
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v2.1.3, etc.
   pull_request:
     branches: [ main ]
 
@@ -34,8 +36,8 @@ jobs:
   build-android:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
     steps:
     - uses: actions/checkout@v4
 
@@ -44,7 +46,14 @@ jobs:
       with:
         flutter-version: '3.35.2'
         channel: 'stable'
-
+    
+    - name: Setup Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.2'
+        bundler-cache: true
+        working-directory: android
+    
     - name: Install dependencies
       run: flutter pub get
 
@@ -67,36 +76,156 @@ jobs:
         name: release-aab
         path: build/app/outputs/bundle/release/app-release.aab
         retention-days: 30
+    
+    - name: Deploy to Firebase App Distribution
+      env:
+        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID_ANDROID }}
+      run: |
+        cd android
+        bundle exec fastlane deploy_to_firebase
 
-  build-windows:
+  # build-ios:
+  #   needs: test
+  #   runs-on: macos-latest
+  #   if: github.ref == 'refs/heads/main'
+    
+  #   steps:
+  #   - uses: actions/checkout@v4
+    
+  #   - name: Setup Flutter
+  #     uses: subosito/flutter-action@v2
+  #     with:
+  #       flutter-version: '3.35.2'
+  #       channel: 'stable'
+    
+  #   - name: Setup Ruby
+  #     uses: ruby/setup-ruby@v1
+  #     with:
+  #       ruby-version: '3.2'
+  #       bundler-cache: true
+  #       working-directory: ios
+    
+  #   - name: Install dependencies
+  #     run: flutter pub get
+    
+  #   - name: Build iOS (no codesign)
+  #     run: flutter build ios --release --no-codesign
+    
+  #   - name: Create IPA archive
+  #     run: |
+  #       cd build/ios/iphoneos
+  #       mkdir Payload
+  #       cp -r Runner.app Payload/
+  #       zip -r app-release.ipa Payload
+    
+  #   - name: Upload IPA
+  #     uses: actions/upload-artifact@v4
+  #     with:
+  #       name: release-ipa
+  #       path: build/ios/iphoneos/app-release.ipa
+  #       retention-days: 30
+    
+  #   - name: Deploy to Firebase App Distribution
+  #     env:
+  #       FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+  #       FIREBASE_APP_ID_IOS: ${{ secrets.FIREBASE_APP_ID_IOS }}
+  #     run: |
+  #       cd ios
+  #       bundle exec fastlane deploy_to_firebase
+
+  build-macos:
     needs: test
-    runs-on: windows-latest
-    if: github.ref == 'refs/heads/main'
-
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
     steps:
     - uses: actions/checkout@v4
-
+    
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.35.2'
         channel: 'stable'
-
+    
     - name: Install dependencies
       run: flutter pub get
+    
+    - name: Build macOS
+      run: flutter build macos --release
+    
+    - name: Create macOS archive
+      run: |
+        cd build/macos/Build/Products/Release
+        zip -r note_app-macos.zip note_app.app
+    
+    - name: Upload macOS App
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-macos
+        path: build/macos/Build/Products/Release/note_app-macos.zip
+        retention-days: 30
 
-    - name: Enable Windows desktop
-      run: flutter config --enable-windows-desktop
-
+  build-windows:
+    needs: test
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.35.2'
+        channel: 'stable'
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
     - name: Build Windows
       run: flutter build windows --release
-
-    - name: Archive Windows build
-      run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\windows\note-app-windows.zip
-
-    - name: Upload Windows build
+    
+    - name: Create Windows archive
+      run: |
+        Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath build/windows/note_app-windows.zip
+    
+    - name: Upload Windows App
       uses: actions/upload-artifact@v4
       with:
         name: release-windows
-        path: build/windows/note-app-windows.zip
+        path: build/windows/note_app-windows.zip
         retention-days: 30
+
+  create-release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Download macOS App
+      uses: actions/download-artifact@v4
+      with:
+        name: release-macos
+        path: ./artifacts
+    
+    - name: Download Windows App
+      uses: actions/download-artifact@v4
+      with:
+        name: release-windows
+        path: ./artifacts
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./artifacts/note_app-macos.zip
+          ./artifacts/note_app-windows.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

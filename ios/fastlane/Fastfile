@@ -1,15 +1,14 @@
-default_platform(:android)
+default_platform(:ios)
 
-platform :android do
+platform :ios do
   desc "Deploy to Firebase App Distribution"
   lane :deploy_to_firebase do
     firebase_app_distribution(
-      app: ENV["FIREBASE_APP_ID"],
+      app: ENV["FIREBASE_APP_ID_IOS"],
       firebase_cli_token: ENV["FIREBASE_TOKEN"],
-      android_artifact_type: "APK",
-      android_artifact_path: "../build/app/outputs/flutter-apk/app-release.apk",
+      ipa_path: "../build/ios/Debug-iphoneos/app-debug.ipa",
       groups: "testers",
-      release_notes: "Automated build from CI/CD pipeline"
+      release_notes: "Automated iOS debug build from CI/CD pipeline"
     )
   end
 
@@ -26,7 +25,8 @@ platform :android do
     Dir.chdir("..") do
       sh("flutter clean")
       sh("flutter pub get")
-      sh("flutter build appbundle --release")
+      sh("flutter build ios --release --no-codesign")
     end
   end
 end
+

@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
-import 'package:note_app/data/models/todo_model.dart';
-import 'package:note_app/data/services/todo_api_service.dart';
+import 'package:notes/data/models/todo_model.dart';
+import 'package:notes/data/services/todo_api_service.dart';
 
 // Generate mocks
 @GenerateMocks([http.Client])

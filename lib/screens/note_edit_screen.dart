@@ -21,7 +21,6 @@ class NoteEditScreen extends StatefulWidget {
 
 class _NoteEditScreenState extends State<NoteEditScreen>
     with WidgetsBindingObserver {
-  final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _contentSearchController = TextEditingController();
   final FocusNode _contentFocusNode = FocusNode();
@@ -34,7 +33,6 @@ class _NoteEditScreenState extends State<NoteEditScreen>
   List<String> _imagePaths = [];
   List<String> _audioPaths = [];
   List<String> _tags = [];
-  final TextEditingController _tagController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
 
   // Key to access the RichTextEditor's functionality
@@ -46,14 +44,15 @@ class _NoteEditScreenState extends State<NoteEditScreen>
     super.initState();
     _currentNote = widget.note;
     if (widget.note != null) {
-      _titleController.text = widget.note!.title;
-      _contentController.text = widget.note!.content;
+      final combinedText = widget.note!.content.isEmpty
+          ? widget.note!.title
+          : '${widget.note!.title}\n${widget.note!.content}';
+      _contentController.text = combinedText;
       _imagePaths = List.from(widget.note!.imagePaths);
       _audioPaths = List.from(widget.note!.audioPaths);
       _tags = List.from(widget.note!.tags);
     }
 
-    _titleController.addListener(_onTextChanged);
     _contentController.addListener(_onTextChanged);
 
     _periodicSaveTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -95,9 +94,7 @@ class _NoteEditScreenState extends State<NoteEditScreen>
   void dispose() {
     _debounceTimer?.cancel();
     _periodicSaveTimer?.cancel();
-    _titleController.removeListener(_onTextChanged);
     _contentController.removeListener(_onTextChanged);
-    _titleController.dispose();
     _contentController.dispose();
     _contentSearchController.dispose();
     _contentFocusNode.dispose();
@@ -128,6 +125,20 @@ class _NoteEditScreenState extends State<NoteEditScreen>
       });
     }
 
+    // Extract hashtags from content
+    final RegExp hashtagRegex = RegExp(r'\B#(\w+)');
+    final matches = hashtagRegex.allMatches(_contentController.text);
+    final Set<String> newTags = matches.map((m) => m.group(1)!).toSet();
+
+    // Update tags if changed
+    final currentTagsSet = _tags.toSet();
+    if (newTags.length != currentTagsSet.length ||
+        !newTags.every((tag) => currentTagsSet.contains(tag))) {
+      setState(() {
+        _tags = newTags.toList();
+      });
+    }
+
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       // Shorter delay for metadata
@@ -138,8 +149,10 @@ class _NoteEditScreenState extends State<NoteEditScreen>
   Future<void> _saveNote() async {
     if (_isSaving) return;
 
-    final title = _titleController.text.trim();
-    var content = _contentController.text.trim();
+    final text = _contentController.text;
+    final lines = text.split('\n');
+    final title = lines.isNotEmpty ? lines[0].trim() : 'Untitled Note';
+    var content = lines.length > 1 ? lines.sublist(1).join('\n').trim() : '';
 
     // Save BOTH image and audio metadata before processing content
     final editorState = _editorKey.currentState;
@@ -334,20 +347,12 @@ class _NoteEditScreenState extends State<NoteEditScreen>
     }
   }
 
-  void _addTag() {
-    final tag = _tagController.text.trim();
-    if (tag.isNotEmpty && !_tags.contains(tag)) {
-      setState(() {
-        _tags.add(tag);
-        _tagController.clear();
-        _hasUnsavedChanges = true;
-      });
-    }
-  }
-
   void _removeTag(String tag) {
     setState(() {
       _tags.remove(tag);
+      // Remove the hashtag from the content
+      final text = _contentController.text;
+      _contentController.text = text.replaceAll('#$tag', tag);
       _hasUnsavedChanges = true;
     });
   }
@@ -420,7 +425,6 @@ class _NoteEditScreenState extends State<NoteEditScreen>
       child: SafeArea(
         child: Column(
           children: [
-            _buildTitleField(),
             _buildTagsSection(),
             _buildContentSearchBar(),
             _buildContentSection(), // This will now be expanded
@@ -433,7 +437,7 @@ class _NoteEditScreenState extends State<NoteEditScreen>
 
   CupertinoNavigationBar _buildNavigationBar() {
     return CupertinoNavigationBar(
-      middle: Text(_currentNote == null ? 'New Note' : 'Edit Note'),
+      middle: Text(_currentNote == null ? 'New Note' : _currentNote!.title),
       leading: CupertinoButton(
         padding: EdgeInsets.zero,
         onPressed: _goBack,
@@ -444,7 +448,6 @@ class _NoteEditScreenState extends State<NoteEditScreen>
         children: [
           _buildSearchButton(),
           _buildMoreButton(), // Three-dot menu
-          _buildSaveButton(),
           _buildNewNoteButton(), // New Note button
         ],
       ),
@@ -479,74 +482,51 @@ class _NoteEditScreenState extends State<NoteEditScreen>
         CupertinoPageRoute(builder: (context) => const NoteEditScreen()),
       ),
       child: const Icon(
-        CupertinoIcons.add_circled,
+        CupertinoIcons.create_solid,
         color: CupertinoColors.activeBlue,
       ),
     );
   }
 
   Widget _buildTagsSection() {
+    if (_tags.isEmpty) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: CupertinoTextField(
-                  controller: _tagController,
-                  placeholder: 'Add tag...',
-                  onSubmitted: (_) => _addTag(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _addTag,
-                child: const Icon(CupertinoIcons.add),
-              ),
-            ],
-          ),
-          if (_tags.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: _tags
-                  .map((tag) => Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: CupertinoColors.activeBlue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: _tags
+            .map((tag) => Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.activeBlue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '#$tag',
+                        style: const TextStyle(
+                          color: CupertinoColors.activeBlue,
+                          fontWeight: FontWeight.w500,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '#$tag',
-                              style: const TextStyle(
-                                color: CupertinoColors.activeBlue,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            GestureDetector(
-                              onTap: () => _removeTag(tag),
-                              child: const Icon(
-                                CupertinoIcons.xmark,
-                                size: 12,
-                                color: CupertinoColors.activeBlue,
-                              ),
-                            ),
-                          ],
+                      ),
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: () => _removeTag(tag),
+                        child: const Icon(
+                          CupertinoIcons.xmark,
+                          size: 12,
+                          color: CupertinoColors.activeBlue,
                         ),
-                      ))
-                  .toList(),
-            ),
-          ],
-        ],
+                      ),
+                    ],
+                  ),
+                ))
+            .toList(),
       ),
     );
   }
@@ -606,43 +586,6 @@ class _NoteEditScreenState extends State<NoteEditScreen>
             style: TextStyle(color: CupertinoColors.destructiveRed),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSaveButton() {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      onPressed: _hasUnsavedChanges ? () => _saveNote() : null,
-      child: Text(
-        'Save',
-        style: TextStyle(
-          color: _hasUnsavedChanges
-              ? CupertinoColors.activeBlue
-              : CupertinoColors.secondaryLabel.resolveFrom(context),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTitleField() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: CupertinoTextField(
-        controller: _titleController,
-        placeholder: 'Note title',
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground.resolveFrom(context),
-          border: Border(
-            bottom: BorderSide(
-              color: CupertinoColors.separator.resolveFrom(context),
-              width: 0.5,
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       ),
     );
   }
@@ -751,8 +694,7 @@ class _NoteEditScreenState extends State<NoteEditScreen>
             const Text('Unsaved changes',
                 style: TextStyle(
                     color: CupertinoColors.systemOrange, fontSize: 14)),
-          ] else if (_titleController.text.isNotEmpty ||
-              _contentController.text.isNotEmpty ||
+          ] else if (_contentController.text.isNotEmpty ||
               _imagePaths.isNotEmpty ||
               _audioPaths.isNotEmpty) ...[
             const Icon(CupertinoIcons.checkmark_circle_fill,

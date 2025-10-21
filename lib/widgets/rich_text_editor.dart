@@ -46,46 +46,73 @@ class _RichTextEditorState extends State<RichTextEditor>
     with ImageMetadataProvider, AudioMetadataProvider, TodoMetadataProvider {
   final ScrollController _scrollController = ScrollController();
   late TextEditingController _displayController;
+  late TextEditingController _titleController;
+  late TextEditingController _contentController;
+  final FocusNode _contentFocusNode = FocusNode();
   String _lastControllerText = '';
   late ImageOverlayManager _imageManager;
   late AudioOverlayManager _audioManager; // Add this
   late TodoOverlayManager _todoManager;
+  bool _isUpdatingFromController = false;
   @override
   void initState() {
     super.initState();
-    _displayController = TextEditingController();
+    _lastControllerText = widget.controller.text;
+
+    // Initialize display controller with clean text
+    final cleanText = widget.controller.text
+        .replaceAll(RegExp(r'\[IMAGE:[^\]]+\]\n?'), '')
+        .replaceAll(RegExp(r'\[IMAGE_META:[^\]]+\]\n?'), '')
+        .replaceAll(RegExp(r'\[AUDIO:[^\]]+\]\n?'), '')
+        .replaceAll(RegExp(r'\[AUDIO_META:[^\]]+\]\n?'), '')
+        .replaceAll(RegExp(r'\[TODO_META:[^\]]+\]\n?'), '')
+        .trim();
+
+    _displayController = TextEditingController(text: cleanText);
+
+    // Initialize title and content controllers
+    final lines = cleanText.split('\n');
+    _titleController =
+        TextEditingController(text: lines.isNotEmpty ? lines[0] : '');
+    _contentController = TextEditingController(
+        text: lines.length > 1 ? lines.sublist(1).join('\n') : '');
+
     _imageManager = ImageOverlayManager(
       onImageRemove: widget.onImageRemove,
       onStateChanged: () => setState(() {}),
       onMetadataChanged: _saveMetadataToController,
     );
 
-    // Initialize audio manager
     _audioManager = AudioOverlayManager(
       onAudioRemove: widget.onAudioRemove,
       onStateChanged: () => setState(() {}),
       onMetadataChanged: _saveMetadataToController,
     );
 
-    widget.controller.addListener(_onControllerChange);
-    _updateDisplayController();
-    _imageManager.initializeFromText(widget.controller.text);
-    _audioManager.initializeFromText(widget.controller.text); // Add this
-
     _todoManager = TodoOverlayManager(
       onStateChanged: () => setState(() {}),
       onMetadataChanged: _saveMetadataToController,
     );
+
+    // Initialize managers with text
+    _imageManager.initializeFromText(widget.controller.text);
+    _audioManager.initializeFromText(widget.controller.text);
     _todoManager.initializeFromText(widget.controller.text);
+
+    // Add listener last to avoid triggering during initialization
+    widget.controller.addListener(_onControllerChange);
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChange);
     _displayController.dispose();
+    _titleController.dispose();
+    _contentController.dispose();
+    _contentFocusNode.dispose();
     _scrollController.dispose();
     _imageManager.dispose();
-    _audioManager.dispose(); // Add this
+    _audioManager.dispose();
     _todoManager.dispose();
     super.dispose();
   }
@@ -108,38 +135,43 @@ class _RichTextEditorState extends State<RichTextEditor>
     if (widget.controller.text != _lastControllerText) {
       _updateDisplayController();
       _imageManager.initializeFromText(widget.controller.text);
-      _audioManager.initializeFromText(widget.controller.text); // Add this
+      _audioManager.initializeFromText(widget.controller.text);
       _todoManager.initializeFromText(widget.controller.text);
       _lastControllerText = widget.controller.text;
     }
   }
 
   void _updateDisplayController() {
+    if (_isUpdatingFromController) return;
+
     final cleanText = widget.controller.text
         .replaceAll(RegExp(r'\[IMAGE:[^\]]+\]\n?'), '')
         .replaceAll(RegExp(r'\[IMAGE_META:[^\]]+\]\n?'), '')
-        .replaceAll(RegExp(r'\[AUDIO:[^\]]+\]\n?'), '') // Add this
+        .replaceAll(RegExp(r'\[AUDIO:[^\]]+\]\n?'), '')
         .replaceAll(RegExp(r'\[AUDIO_META:[^\]]+\]\n?'), '')
         .replaceAll(RegExp(r'\[TODO_META:[^\]]+\]\n?'), '')
         .trim();
-    // Add this
 
     if (_displayController.text != cleanText) {
-      final selection = _displayController.selection;
+      _isUpdatingFromController = true;
       _displayController.text = cleanText;
 
-      if (selection.baseOffset <= cleanText.length) {
-        _displayController.selection = selection;
-      } else {
-        _displayController.selection =
-            TextSelection.collapsed(offset: cleanText.length);
+      // Split and update title/content controllers
+      final lines = cleanText.split('\n');
+      if (lines.isNotEmpty) {
+        _titleController.text = lines[0];
+        _contentController.text =
+            lines.length > 1 ? lines.sublist(1).join('\n') : '';
       }
+      _isUpdatingFromController = false;
     }
   }
 
   void _onDisplayTextChanged(String value) {
+    if (_isUpdatingFromController) return;
+
     final RegExp imageRegex = RegExp(r'\[IMAGE:([^\]]+)\]');
-    final RegExp audioRegex = RegExp(r'\[AUDIO:([^\]]+)\]'); // Add this
+    final RegExp audioRegex = RegExp(r'\[AUDIO:([^\]]+)\]');
     final RegExp todoMetaRegex = RegExp(r'\[TODO_META:[^\]]+\]');
 
     final existingImages = imageRegex
@@ -148,12 +180,12 @@ class _RichTextEditorState extends State<RichTextEditor>
         .toList();
 
     final existingAudios = audioRegex
-        .allMatches(widget.controller.text) // Add this
+        .allMatches(widget.controller.text)
         .map((match) => match.group(0)!)
         .toList();
 
     final existingTodoMeta = todoMetaRegex
-        .allMatches(widget.controller.text) // Add this
+        .allMatches(widget.controller.text)
         .map((match) => match.group(0)!)
         .toList();
 
@@ -162,16 +194,20 @@ class _RichTextEditorState extends State<RichTextEditor>
       newText += '\n$imageTag';
     }
     for (String audioTag in existingAudios) {
-      // Add this
       newText += '\n$audioTag';
     }
     for (String todoMeta in existingTodoMeta) {
-      // Add this
       newText += '\n$todoMeta';
     }
 
     _lastControllerText = newText;
+    _isUpdatingFromController = true;
     widget.controller.text = newText;
+    _displayController.text = value;
+    _isUpdatingFromController = false;
+
+    // Don't update title/content controllers here as they triggered this change
+    // Updating them here causes cursor jumping and only allows 1 character to be typed
   }
 
   void _handleTapOutside() {
@@ -201,6 +237,58 @@ class _RichTextEditorState extends State<RichTextEditor>
     _audioManager.addAudio(audioPath);
   }
 
+  Widget _buildStyledTextField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CupertinoTextField(
+          controller: _titleController,
+          focusNode: widget.focusNode,
+          placeholder: 'Start typing your note title...',
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: widget.searchQuery.isNotEmpty ? Colors.transparent : null,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
+          ),
+          padding: const EdgeInsets.only(bottom: 8),
+          onChanged: (value) {
+            if (!_isUpdatingFromController) {
+              _onDisplayTextChanged(value +
+                  (_contentController.text.isEmpty
+                      ? ''
+                      : '\n${_contentController.text}'));
+            }
+          },
+        ),
+        CupertinoTextField(
+          controller: _contentController,
+          focusNode: _contentFocusNode,
+          placeholder: 'Add your note content...',
+          maxLines: null,
+          minLines: 15,
+          style: TextStyle(
+            fontSize: 16,
+            color: widget.searchQuery.isNotEmpty ? Colors.transparent : null,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
+          ),
+          padding: EdgeInsets.zero,
+          onChanged: (value) {
+            if (!_isUpdatingFromController) {
+              _onDisplayTextChanged(
+                  _titleController.text + (value.isEmpty ? '' : '\n$value'));
+            }
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -221,7 +309,11 @@ class _RichTextEditorState extends State<RichTextEditor>
               constraints.maxWidth, constraints.maxHeight)); // Add this line
 
           return GestureDetector(
-            onTap: _handleTapOutside,
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              // Only deselect if not tapping on text fields
+              _handleTapOutside();
+            },
             onDoubleTap: () {
               // Show todo creation dialog
               showCupertinoDialog(
@@ -253,25 +345,7 @@ class _RichTextEditorState extends State<RichTextEditor>
                         Stack(
                           children: [
                             // Background text field for editing
-                            CupertinoTextField(
-                              controller: _displayController,
-                              focusNode: widget.focusNode,
-                              placeholder: 'Start typing your note...',
-                              maxLines: null,
-                              minLines:
-                                  20, // Increased minLines for larger text area
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: widget.searchQuery.isNotEmpty
-                                    ? Colors.transparent
-                                    : null,
-                              ),
-                              decoration: const BoxDecoration(
-                                color: Colors.transparent,
-                              ),
-                              padding: EdgeInsets.zero,
-                              onChanged: _onDisplayTextChanged,
-                            ),
+                            _buildStyledTextField(),
 
                             // Overlay highlighted text when searching
                             if (widget.searchQuery.isNotEmpty)
