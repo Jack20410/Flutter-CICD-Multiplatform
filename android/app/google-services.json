@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "336403606227",
+    "project_id": "cross-platform-mid",
+    "storage_bucket": "cross-platform-mid.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:336403606227:android:5797feac58e4ae9cc60226",
+        "android_client_info": {
+          "package_name": "com.example.note_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXukwz3ld7YZWLzL7AaX-W7RMh72Bt3Aw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

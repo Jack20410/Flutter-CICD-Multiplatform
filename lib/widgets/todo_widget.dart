@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../models/todo_item.dart';
 
 class TodoWidget extends StatefulWidget {
@@ -10,7 +12,8 @@ class TodoWidget extends StatefulWidget {
   final Offset position;
   final bool isSelected;
   final Function() onTap;
-  final Function(Offset) onMove;
+  final Function(Offset) onMoveDelta;
+  final VoidCallback? onMoveEnd;
 
   const TodoWidget({
     super.key,
@@ -21,7 +24,8 @@ class TodoWidget extends StatefulWidget {
     required this.position,
     required this.isSelected,
     required this.onTap,
-    required this.onMove,
+    required this.onMoveDelta,
+    this.onMoveEnd,
   });
 
   @override
@@ -108,9 +112,17 @@ class _TodoWidgetState extends State<TodoWidget>
         onTap: widget.onTap,
         onPanStart: (details) {
           widget.onTap(); // Select when starting to drag
+          HapticFeedback.mediumImpact();
         },
         onPanUpdate: (details) {
-          widget.onMove(widget.position + details.delta);
+          widget.onMoveDelta(details.delta);
+        },
+        onPanEnd: (details) {
+          widget.onMoveEnd?.call();
+          HapticFeedback.lightImpact();
+        },
+        onPanCancel: () {
+          widget.onMoveEnd?.call();
         },
         child: AnimatedBuilder(
           animation: _animationController,
@@ -181,32 +193,85 @@ class _TodoWidgetState extends State<TodoWidget>
 
                       // Content
                       Expanded(
-                        child: _isEditing
-                            ? CupertinoTextField(
-                                controller: _textController,
-                                autofocus: true,
-                                decoration: const BoxDecoration(),
-                                style: const TextStyle(fontSize: 14),
-                                onSubmitted: (_) => _finishEditing(),
-                                onEditingComplete: _finishEditing,
-                              )
-                            : GestureDetector(
-                                onDoubleTap: _startEditing,
-                                child: Text(
-                                  widget.todoItem.content,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    decoration: widget.todoItem.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: widget.todoItem.isCompleted
-                                        ? CupertinoColors.systemGrey
-                                            .resolveFrom(context)
-                                        : CupertinoColors.label
-                                            .resolveFrom(context),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _isEditing
+                                ? CupertinoTextField(
+                                    controller: _textController,
+                                    autofocus: true,
+                                    decoration: const BoxDecoration(),
+                                    style: const TextStyle(fontSize: 14),
+                                    onSubmitted: (_) => _finishEditing(),
+                                    onEditingComplete: _finishEditing,
+                                  )
+                                : GestureDetector(
+                                    onDoubleTap: _startEditing,
+                                    child: Text(
+                                      widget.todoItem.content,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        decoration: widget.todoItem.isCompleted
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                        color: widget.todoItem.isCompleted
+                                            ? CupertinoColors.systemGrey
+                                                .resolveFrom(context)
+                                            : CupertinoColors.label
+                                                .resolveFrom(context),
+                                      ),
+                                    ),
                                   ),
-                                ),
+                            // Due Date Display
+                            if (widget.todoItem.dueDate != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    CupertinoIcons.clock,
+                                    size: 12,
+                                    color: widget.todoItem.isOverdue
+                                        ? CupertinoColors.destructiveRed
+                                        : widget.todoItem.isCloseToDeadline
+                                            ? CupertinoColors.systemOrange
+                                            : CupertinoColors.systemGrey,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    DateFormat('MMM d, HH:mm')
+                                        .format(widget.todoItem.dueDate!),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: widget.todoItem.isOverdue
+                                          ? CupertinoColors.destructiveRed
+                                          : widget.todoItem.isCloseToDeadline
+                                              ? CupertinoColors.systemOrange
+                                              : CupertinoColors.systemGrey,
+                                      fontWeight: widget.todoItem.isOverdue ||
+                                              widget.todoItem.isCloseToDeadline
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                    ),
+                                  ),
+                                  if (widget.todoItem.isOverdue)
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 4),
+                                      child: Text(
+                                        'OVERDUE',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: CupertinoColors.destructiveRed,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
+                            ],
+                          ],
+                        ),
                       ),
 
                       // Remove button (only show when selected)

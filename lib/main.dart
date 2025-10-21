@@ -3,10 +3,15 @@ import 'package:provider/provider.dart';
 import 'providers/note_provider.dart';
 import 'screens/notes_list_screen.dart';
 import 'services/semantic_search_service.dart';
+import 'services/auth_service.dart'; // Add this import
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   // Initialize database factory for desktop platforms
   await SemanticSearchService.initializeDatabaseFactory();
 
@@ -18,8 +23,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => NoteProvider(),
+    return MultiProvider(
+      // Changed from ChangeNotifierProvider to MultiProvider
+      providers: [
+        ChangeNotifierProvider(create: (context) => NoteProvider()),
+        ChangeNotifierProvider(
+            create: (context) => AuthService()), // Add AuthService
+      ],
       child: const CupertinoApp(
         title: 'Flutter Notes',
         theme: CupertinoThemeData(

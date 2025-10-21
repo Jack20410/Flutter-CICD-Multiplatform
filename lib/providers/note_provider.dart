@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 import '../models/note.dart';
 import '../helpers/db_helper.dart';
 import '../services/semantic_search_service.dart';
+import '../services/cloud_sync_service.dart';
+import '../services/auth_service.dart';
+import '../models/deletion_record.dart';
+
+enum SyncStatus { upToDate, unsaved, checking, syncing }
 
 class NoteProvider with ChangeNotifier {
   List<Note> _notes = [];
@@ -26,6 +31,16 @@ class NoteProvider with ChangeNotifier {
   bool _indexBuilt = false;
 
   bool get isUsingSemanticSearch => _useSemanticSearch && _indexBuilt;
+  SyncStatus _syncStatus = SyncStatus.unsaved;
+  DateTime? _lastSyncTime;
+
+  SyncStatus get syncStatus => _syncStatus;
+  DateTime? get lastSyncTime => _lastSyncTime;
+
+  void setSyncStatus(SyncStatus status) {
+    _syncStatus = status;
+    notifyListeners();
+  }
 
   Future<void> _buildSearchIndex() async {
     if (_allNotes.isEmpty) return;
@@ -35,6 +50,34 @@ class NoteProvider with ChangeNotifier {
       _indexBuilt = true;
     } catch (e) {
       _indexBuilt = false;
+    }
+  }
+
+  Future<void> checkSyncStatus(AuthService authService) async {
+    setSyncStatus(SyncStatus.checking);
+
+    try {
+      if (!authService.isAuthenticated) {
+        setSyncStatus(SyncStatus.unsaved);
+        return;
+      }
+
+      final cloudSync = CloudSyncService(userId: authService.userId!);
+      final remoteNotes = await cloudSync.fetchRemoteNotes();
+
+      // Compare local and remote notes
+      final localNotesIds = _notes.map((n) => n.id).toSet();
+      final remoteNotesIds = remoteNotes.map((n) => n.id).toSet();
+
+      if (localNotesIds.length == remoteNotesIds.length &&
+          localNotesIds.difference(remoteNotesIds).isEmpty) {
+        setSyncStatus(SyncStatus.upToDate);
+        _lastSyncTime = DateTime.now();
+      } else {
+        setSyncStatus(SyncStatus.unsaved);
+      }
+    } catch (e) {
+      setSyncStatus(SyncStatus.unsaved);
     }
   }
 
@@ -116,6 +159,14 @@ class NoteProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // In NoteProvider class
+  Future<List<DeletionRecord>> getAllDeletions() async {
+    if (_dbHelper != null) {
+      return await _dbHelper.getAllDeletions();
+    }
+    return [];
+  }
+
   Future<void> addNote(String title, String content) async {
     Note newNote = Note(
       title: title,
@@ -134,6 +185,7 @@ class NoteProvider with ChangeNotifier {
 
     // Fix: Rebuild search index after adding note
     _indexBuilt = false;
+    setSyncStatus(SyncStatus.unsaved);
   }
 
   Future<void> updateNote(Note note) async {
@@ -146,23 +198,25 @@ class NoteProvider with ChangeNotifier {
         _notes[index] = note;
         notifyListeners();
       }
+      setSyncStatus(SyncStatus.unsaved);
     }
 
     // Fix: Rebuild search index after updating note
     _indexBuilt = false;
   }
 
+  // In lib/providers/note_provider.dart
   Future<void> deleteNote(int id) async {
     if (_dbHelper != null) {
-      await _dbHelper.delete(id);
+      await _dbHelper.delete(id); // This now records deletion automatically
       await fetchNotes();
     } else {
       _notes.removeWhere((note) => note.id == id);
       notifyListeners();
     }
 
-    // Fix: Rebuild search index after deleting note
     _indexBuilt = false;
+    setSyncStatus(SyncStatus.unsaved);
   }
 
   Future<void> addNoteWithMedia(Note note) async {
