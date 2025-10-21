@@ -288,8 +288,8 @@ class ImageOverlayManager {
 
                 // Constrain to container bounds
                 final imageWidth = imageSize.width + 16;
-                final constrainedX = newPosition.dx.clamp(
-                    0.0, _containerSize.width - imageWidth - 24);
+                final constrainedX = newPosition.dx
+                    .clamp(0.0, _containerSize.width - imageWidth - 24);
                 final constrainedY = newPosition.dy.clamp(0.0, double.infinity);
 
                 _imagePositions[imagePath] = Offset(constrainedX, constrainedY);

@@ -259,8 +259,8 @@ class AudioOverlayManager {
               HapticFeedback.mediumImpact();
             },
             onPanUpdate: (details) {
-              final index = _audioItems
-                  .indexWhere((item) => item.audioPath == audioPath);
+              final index =
+                  _audioItems.indexWhere((item) => item.audioPath == audioPath);
               if (index != -1) {
                 final currentPosition = _audioItems[index].position;
                 final newPosition = Offset(
@@ -273,7 +273,8 @@ class AudioOverlayManager {
                     newPosition.dx.clamp(0.0, _containerSize.width - 280 - 24);
                 final constrainedY = newPosition.dy.clamp(0.0, double.infinity);
 
-                _audioItems[index].position = Offset(constrainedX, constrainedY);
+                _audioItems[index].position =
+                    Offset(constrainedX, constrainedY);
                 onStateChanged();
               }
             },
