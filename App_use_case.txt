@@ -1,0 +1,125 @@
+📱 Note App - Feature Summary
+
+  📝 Core Note Features
+
+  - Create & Edit Notes with rich text editor
+  - Auto-save (every 30 seconds + on text change)
+  - Title & Content fields with search within notes
+  - Visual status indicators (saving/unsaved/saved)
+  - Grouped by month with expandable sections in list view
+  - Delete with confirmation (swipe left)
+
+  🔐 Authentication & User Management
+
+  - Email/Password authentication (Firebase Auth)
+  - Sign Up with display name
+  - Sign In with remember me
+  - Password reset via email
+  - Email verification
+  - Profile management (edit name, view email)
+  - Sign out functionality
+  - User avatars with initials
+
+  📌 Organization Features
+
+  - Pin notes (swipe right when logged in) - stays at top
+  - Pinned section displayed separately with orange badge
+  - Tags system - add/remove tags, tag filtering
+  - Tag search - filter notes by tags
+  - Monthly grouping - collapsible sections by month
+
+  🔍 Search Capabilities
+
+  - Basic text search - search note titles and content
+  - Semantic search (AI-powered) - smart search using ML
+  - In-note content search - find text within a note
+  - Search result counter - shows number of matches
+  - Search mode indicator - shows if using basic or smart search
+
+  🖼️  Image Features
+
+  - Add images from camera or gallery
+  - Multiple images per note
+  - Draggable & resizable images
+  - Image positioning - place anywhere in note
+  - Image viewer - fullscreen view with swipe navigation
+  - Corner & edge resize handles - maintain or free aspect ratio
+  - Delete images from viewer or note
+  - Image metadata persistence - positions and sizes saved
+
+  🎵 Audio Features
+
+  - Attach audio files to notes
+  - Audio player widget with play/pause, seek
+  - Custom audio names - rename audio files
+  - Draggable audio players - position anywhere
+  - Audio metadata - stored in note content
+  - Multiple audio files per note
+
+  ✅ TODO List Features (Enhanced)
+
+  - Create TODO items by double-tapping in editor
+  - Draggable TODOs - position anywhere in note
+  - Check/uncheck items with animation
+  - Edit TODO text (double-tap text)
+  - Delete TODOs (when selected)
+  - Due dates (Optional):
+    - 📅 Date & time picker
+    - 🔴 Red "OVERDUE" badge when past deadline
+    - 🟡 Orange/yellow when within 1 day of deadline
+    - ⚪ Gray when more than 1 day away
+  - TODO metadata - positions and states saved
+  - Auto-remove completed items with animation
+
+  ☁️ Cloud Sync Features
+
+  - Firebase Firestore integration
+  - Sync notes across devices
+  - Conflict detection - warns before sync
+  - Upload/download notes
+  - Deletion tracking - prevents re-downloading deleted notes
+  - Sync status indicator (checking/syncing/up-to-date/unsaved)
+
+  🎨 UI/UX Features
+
+  - iOS-style design (Cupertino widgets)
+  - Dark/Light mode support
+  - Smooth animations for all interactions
+  - Haptic feedback on drag/interactions
+  - Swipe gestures:
+    - Left: Delete note
+    - Right: Pin note (when logged in) or go to login
+  - Real-time dragging (60fps) for all items
+  - Visual feedback - selected items highlighted
+  - Empty states - helpful messages when no notes
+
+  💾 Data Management
+
+  - Local SQLite database for offline storage
+  - Cloud backup via Firebase Firestore
+  - Export data (planned feature)
+  - Image/audio file storage in app documents
+  - Metadata encoding - Base64 JSON for positions/settings
+
+  🔄 Performance Optimizations
+
+  - Debounced auto-save - prevents excessive saves
+  - Metadata saved only on drag end - smooth 60fps dragging
+  - Efficient re-rendering - only updates changed widgets
+  - Image caching - faster load times
+
+  🛡️  Security & Privacy
+
+  - User authentication required for cloud features
+  - Local-first - works offline
+  - Firebase security rules - user-specific data access
+  - Password validation - minimum 6 characters
+
+  🎯 Use Cases
+
+  - Personal note-taking with rich media
+  - Task management with visual TODOs and deadlines
+  - Image/audio documentation
+  - Cross-device note synchronization
+  - Quick capture with auto-save
+  - Organized note collections with tags
