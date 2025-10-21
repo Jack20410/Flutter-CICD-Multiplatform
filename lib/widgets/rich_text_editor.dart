@@ -227,13 +227,13 @@ class _RichTextEditorState extends State<RichTextEditor>
               showCupertinoDialog(
                 context: context,
                 builder: (context) => TodoCreationDialog(
-                  onCreateTodo: (content) {
+                  onCreateTodo: (content, dueDate) {
                     // Add todo at center of screen
                     final position = Offset(
                       constraints.maxWidth / 2 - 100,
                       constraints.maxHeight / 2 - 50,
                     );
-                    _todoManager.addTodo(content, position);
+                    _todoManager.addTodo(content, position, dueDate: dueDate);
                   },
                 ),
               );

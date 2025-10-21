@@ -21,11 +21,12 @@ class TodoOverlayManager {
     _containerSize = size;
   }
 
-  void addTodo(String content, Offset position) {
+  void addTodo(String content, Offset position, {DateTime? dueDate}) {
     final todoId = 'todo_${DateTime.now().millisecondsSinceEpoch}';
     final todoItem = TodoItem(
       id: todoId,
       content: content,
+      dueDate: dueDate,
     );
 
     _todoItems.add(todoItem);

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze lib/widgets/todo_creation_dialog.dart)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
