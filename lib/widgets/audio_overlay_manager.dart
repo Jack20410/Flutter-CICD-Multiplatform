@@ -46,7 +46,6 @@ class AudioOverlayManager {
   final List<AudioItem> _audioItems = [];
   String? _selectedAudioPath;
   Size _containerSize = Size.zero;
-  Offset? _dragAnchorPoint;
 
   AudioOverlayManager({
     required this.onAudioRemove,
@@ -255,97 +254,47 @@ class AudioOverlayManager {
               selectAudio(audioPath);
             },
             onPanStart: (details) {
-              _dragAnchorPoint = Offset(
-                details.localPosition.dx,
-                details.localPosition.dy,
-              );
+              _selectedAudioPath = null;
+              onStateChanged();
+              HapticFeedback.mediumImpact();
             },
-            child: Draggable<String>(
-              data: audioPath,
-              feedback: Material(
-                color: Colors.transparent,
-                child: AudioPlayerWidget(
-                  audioPath: audioPath,
-                  position: audioItem.position,
-                  isSelected: false,
-                  onTap: () {},
-                  onMove: (offset) {},
-                  onRemove: (path) {},
-                  onRename: renameAudio,
-                  isDragging: true, // Add this parameter to widget
-                  customName: audioItem.customName,
-                ),
-              ),
-              childWhenDragging: Container(
-                width: 280,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey5
-                      .resolveFrom(context)
-                      .withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: CupertinoColors.separator.resolveFrom(context),
-                    width: 1,
-                    style: BorderStyle.solid,
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    CupertinoIcons.music_note,
-                    size: 40,
-                    color: CupertinoColors.systemGrey.resolveFrom(context),
-                  ),
-                ),
-              ),
-              onDragStarted: () {
-                _selectedAudioPath = null;
+            onPanUpdate: (details) {
+              final index = _audioItems
+                  .indexWhere((item) => item.audioPath == audioPath);
+              if (index != -1) {
+                final currentPosition = _audioItems[index].position;
+                final newPosition = Offset(
+                  currentPosition.dx + details.delta.dx,
+                  currentPosition.dy + details.delta.dy,
+                );
+
+                // Constrain to container bounds
+                final constrainedX =
+                    newPosition.dx.clamp(0.0, _containerSize.width - 280 - 24);
+                final constrainedY = newPosition.dy.clamp(0.0, double.infinity);
+
+                _audioItems[index].position = Offset(constrainedX, constrainedY);
                 onStateChanged();
-                HapticFeedback.mediumImpact();
-              },
-              onDragEnd: (details) {
-                final RenderBox? renderBox =
-                    context.findRenderObject() as RenderBox?;
-                if (renderBox != null) {
-                  final localPosition = renderBox.globalToLocal(details.offset);
-
-                  // Use the anchor point to position more precisely
-                  final anchorOffset =
-                      _dragAnchorPoint ?? const Offset(140, 60);
-
-                  final targetX = localPosition.dx - 12 - anchorOffset.dx;
-                  final targetY = localPosition.dy - 12 - anchorOffset.dy;
-
-                  final constrainedX =
-                      targetX.clamp(0.0, _containerSize.width - 280 - 24);
-                  final constrainedY = targetY.clamp(0.0, double.infinity);
-
-                  final newPosition = Offset(constrainedX, constrainedY);
-
-                  // Update the position in our audio item
-                  final index = _audioItems
-                      .indexWhere((item) => item.audioPath == audioPath);
-                  if (index != -1) {
-                    _audioItems[index].position = newPosition;
-                  }
-
-                  _dragAnchorPoint = null;
-                  onStateChanged();
-                  onMetadataChanged(); // Make sure this is called to save metadata
-                }
-                HapticFeedback.lightImpact();
-              },
-              child: AudioPlayerWidget(
-                audioPath: audioPath,
-                position: audioItem.position,
-                isSelected: isSelected,
-                onTap: () => selectAudio(audioPath),
-                onMove: (offset) {}, // Not used in draggable version
-                onRemove: removeAudio,
-                onRename: renameAudio,
-                isDragging: false,
-                customName: audioItem.customName,
-              ),
+              }
+            },
+            onPanEnd: (details) {
+              onStateChanged();
+              onMetadataChanged();
+              HapticFeedback.lightImpact();
+            },
+            onPanCancel: () {
+              onStateChanged();
+            },
+            child: AudioPlayerWidget(
+              audioPath: audioPath,
+              position: audioItem.position,
+              isSelected: isSelected,
+              onTap: () => selectAudio(audioPath),
+              onMove: (offset) {},
+              onRemove: removeAudio,
+              onRename: renameAudio,
+              isDragging: false,
+              customName: audioItem.customName,
             ),
           ),
         ),

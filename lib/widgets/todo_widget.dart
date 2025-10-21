@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/todo_item.dart';
 
@@ -11,7 +12,8 @@ class TodoWidget extends StatefulWidget {
   final Offset position;
   final bool isSelected;
   final Function() onTap;
-  final Function(Offset) onMove;
+  final Function(Offset) onMoveDelta;
+  final VoidCallback? onMoveEnd;
 
   const TodoWidget({
     super.key,
@@ -22,7 +24,8 @@ class TodoWidget extends StatefulWidget {
     required this.position,
     required this.isSelected,
     required this.onTap,
-    required this.onMove,
+    required this.onMoveDelta,
+    this.onMoveEnd,
   });
 
   @override
@@ -109,9 +112,17 @@ class _TodoWidgetState extends State<TodoWidget>
         onTap: widget.onTap,
         onPanStart: (details) {
           widget.onTap(); // Select when starting to drag
+          HapticFeedback.mediumImpact();
         },
         onPanUpdate: (details) {
-          widget.onMove(widget.position + details.delta);
+          widget.onMoveDelta(details.delta);
+        },
+        onPanEnd: (details) {
+          widget.onMoveEnd?.call();
+          HapticFeedback.lightImpact();
+        },
+        onPanCancel: () {
+          widget.onMoveEnd?.call();
         },
         child: AnimatedBuilder(
           animation: _animationController,

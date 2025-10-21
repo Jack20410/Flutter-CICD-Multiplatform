@@ -15,7 +15,6 @@ class ImageOverlayManager {
   Size _containerSize = Size.zero;
   String? _draggedImage;
   String? _selectedImage; // Track which image is selected for resizing
-  Offset? _dragAnchorPoint;
   static const double maxImageWidth = 250.0;
   static const double maxImageHeight = 300.0;
   static const double minImageSize = 50.0;
@@ -274,79 +273,41 @@ class ImageOverlayManager {
             },
             onDoubleTap: () => _openImageViewer(context, imagePath, text),
             onPanStart: (details) {
-              _dragAnchorPoint = Offset(
-                details.localPosition.dx,
-                details.localPosition.dy,
-              );
+              _draggedImage = imagePath;
+              _selectedImage = null;
+              onStateChanged();
+              HapticFeedback.mediumImpact();
             },
-            child: Draggable<String>(
-              data: imagePath,
-              feedback: Material(
-                color: Colors.transparent,
-                child: _buildImageWidget(context, imagePath, imageSize,
-                    isDragging: true),
-              ),
-              childWhenDragging: Container(
-                width: imageSize.width + 16,
-                height: imageSize.height + 16,
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey5
-                      .resolveFrom(context)
-                      .withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: CupertinoColors.separator.resolveFrom(context),
-                    width: 1,
-                    style: BorderStyle.solid,
-                  ),
-                ),
-              ),
-              onDragStarted: () {
-                _draggedImage = imagePath;
-                _selectedImage = null;
+            onPanUpdate: (details) {
+              if (_draggedImage == imagePath) {
+                final currentPosition = _imagePositions[imagePath] ?? position;
+                final newPosition = Offset(
+                  currentPosition.dx + details.delta.dx,
+                  currentPosition.dy + details.delta.dy,
+                );
 
-                // Store where the user initially touched relative to the image
-                _dragAnchorPoint =
-                    null; // You'd need to capture this from the gesture
+                // Constrain to container bounds
+                final imageWidth = imageSize.width + 16;
+                final constrainedX = newPosition.dx.clamp(
+                    0.0, _containerSize.width - imageWidth - 24);
+                final constrainedY = newPosition.dy.clamp(0.0, double.infinity);
 
+                _imagePositions[imagePath] = Offset(constrainedX, constrainedY);
                 onStateChanged();
-                HapticFeedback.mediumImpact();
-              },
-              onDragEnd: (details) {
-                _draggedImage = null;
-
-                final RenderBox? renderBox =
-                    context.findRenderObject() as RenderBox?;
-                if (renderBox != null) {
-                  final localPosition = renderBox.globalToLocal(details.offset);
-
-                  // Use the anchor point to position more precisely
-                  final anchorOffset = _dragAnchorPoint ??
-                      Offset(
-                        (imageSize.width + 16) / 2,
-                        (imageSize.height + 16) / 2,
-                      );
-
-                  final targetX = localPosition.dx - 12 - anchorOffset.dx;
-                  final targetY = localPosition.dy - 12 - anchorOffset.dy;
-
-                  final imageWidth = imageSize.width + 16;
-                  final constrainedX = targetX.clamp(
-                      0.0, _containerSize.width - imageWidth - 24);
-                  final constrainedY = targetY.clamp(0.0, double.infinity);
-
-                  _imagePositions[imagePath] =
-                      Offset(constrainedX, constrainedY);
-                  _dragAnchorPoint = null; // Reset for next drag
-
-                  onStateChanged();
-                  onMetadataChanged?.call();
-                }
-                HapticFeedback.lightImpact();
-              },
-              child: _buildImageWidget(context, imagePath, imageSize,
-                  isSelected: isSelected),
-            ),
+              }
+            },
+            onPanEnd: (details) {
+              _draggedImage = null;
+              onStateChanged();
+              onMetadataChanged?.call();
+              HapticFeedback.lightImpact();
+            },
+            onPanCancel: () {
+              _draggedImage = null;
+              onStateChanged();
+            },
+            child: _buildImageWidget(context, imagePath, imageSize,
+                isSelected: isSelected, isDragging: _draggedImage == imagePath),
           ),
         ),
       );

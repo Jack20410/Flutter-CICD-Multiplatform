@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(flutter analyze lib/widgets/todo_creation_dialog.dart)"
+      "Bash(flutter analyze lib/widgets/todo_creation_dialog.dart)",
+      "Bash(flutter analyze lib/widgets/image_overlay_manager.dart lib/widgets/audio_overlay_manager.dart lib/widgets/todo_widget.dart)",
+      "Bash(flutter analyze lib/widgets/todo_widget.dart lib/widgets/todo_overlay_manager.dart)"
     ],
     "deny": [],
     "ask": []

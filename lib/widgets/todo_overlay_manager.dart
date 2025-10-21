@@ -77,7 +77,13 @@ class TodoOverlayManager {
     }
   }
 
-  void moveTodo(String todoId, Offset newPosition) {
+  void moveTodoByDelta(String todoId, Offset delta) {
+    final currentPosition = _todoPositions[todoId] ?? const Offset(20, 20);
+    final newPosition = Offset(
+      currentPosition.dx + delta.dx,
+      currentPosition.dy + delta.dy,
+    );
+
     final constrainedPosition = Offset(
       newPosition.dx.clamp(0, _containerSize.width - 250),
       newPosition.dy.clamp(0, _containerSize.height - 100),
@@ -85,6 +91,10 @@ class TodoOverlayManager {
 
     _todoPositions[todoId] = constrainedPosition;
     onStateChanged();
+  }
+
+  void finishMoveTodo(String todoId) {
+    // Save metadata at the end of drag
     onMetadataChanged();
   }
 
@@ -173,7 +183,8 @@ class TodoOverlayManager {
         onToggle: toggleTodo,
         onRemove: removeTodo,
         onEdit: editTodo,
-        onMove: (newPosition) => moveTodo(todoItem.id, newPosition),
+        onMoveDelta: (delta) => moveTodoByDelta(todoItem.id, delta),
+        onMoveEnd: () => finishMoveTodo(todoItem.id),
       );
     }).toList();
   }
